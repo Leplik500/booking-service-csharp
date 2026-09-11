@@ -9,11 +9,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BookingService.Migrations
+namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    [Migration("20260911095632_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260911125032_CancellationRequestedAt")]
+    partial class CancellationRequestedAt
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -43,7 +43,8 @@ namespace BookingService.Migrations
                         .HasColumnName("booked_to");
 
                     b.Property<DateTimeOffset?>("CancellationRequestedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancellation_requested_at");
 
                     b.Property<Guid?>("CatalogRequestId")
                         .HasColumnType("uuid")

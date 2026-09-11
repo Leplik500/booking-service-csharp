@@ -91,6 +91,8 @@ public class Booking
                 Status = BookingStatus.Cancelled;
                 break;
             case BookingStatus.Confirmed:
+                if (currentDate >= BookedFrom)
+                    throw new BusinessException("Нельзя отменить начавшееся бронирование");
                 Status = BookingStatus.CancellationPending;
                 CancellationRequestedAt = DateTimeOffset.UtcNow;
                 break;
@@ -107,7 +109,7 @@ public class Booking
     {
         if (Status != BookingStatus.CancellationPending)
             throw new BusinessException("Некорректный статус для завершения отмены");
-            
+
         Status = BookingStatus.Cancelled;
         CancellationRequestedAt = null;
     }
@@ -119,16 +121,15 @@ public class Booking
         {
             case BookingStatus.CancellationPending:
                 Status = BookingStatus.Confirmed;
+                CancellationRequestedAt = null;
                 break;
             case BookingStatus.Confirmed:
-                break;
             case BookingStatus.None:
             case BookingStatus.AwaitConfirmation:
             case BookingStatus.Cancelled:
             default:
-                throw new BusinessException("Некорректный статус для отката отмены");
+                throw new BusinessException($"Невозможно завершить отмену: ожидается {BookingStatus
+                    .CancellationPending}, текущий — {Status}");
         }
-
-        CancellationRequestedAt = null;
     }
 }

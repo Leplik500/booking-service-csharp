@@ -181,17 +181,25 @@ public class BookingService
     // TODO: Task 01 — откат отмены бронирования (компенсирующая транзакция)
     public async Task HandleCancellationError(Guid requestId)
     {
-        _logger.LogInformation("Произошла ошибка отмены бронирования: requestId={RequestId}", requestId);
+        _logger.LogWarning("Произошла ошибка отмены бронирования: requestId={RequestId}", requestId);
 
         var booking = await _repository.FindByCatalogRequestIdAsync(requestId);
         if (booking is null)
         {
-            _logger.LogWarning("Бронирование не найдено по requestId: {RequestId}. Ошибка проигнорирована.", requestId);
+            _logger.LogWarning("Бронирование не найдено по requestId: {RequestId}. Ошибка проигнорирована.",
+                requestId);
             return;
         }
 
         _logger.LogInformation("Найдено бронирование: id={Id}, статус={Status}. Откатываем...",
                 booking.Id, booking.Status);
+
+        if (booking.Status != BookingStatus.CancellationPending)
+        {
+            _logger.LogWarning("Откат отмены бронирования не был произведён из-за недопустимого статуса: статус={Status}",
+                booking.Status);
+            return;
+        }
 
         booking.RollbackCancellation();
         await _repository.SaveAsync(booking);
