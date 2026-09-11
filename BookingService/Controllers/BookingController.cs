@@ -69,5 +69,5 @@ public class BookingController : ControllerBase
     /// <summary>Получить общее количество бронирований, группировку бронировний по статусам, 5 самых популярных ресурсов</summary>
     [HttpGet("/api/bookings/statistics")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task GetStatistics() => await _bookingService.GetStatistics();
+    public async Task<StatisticsResponse> GetStatistics() => await _bookingService.GetStatistics();
 }

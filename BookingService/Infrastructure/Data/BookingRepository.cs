@@ -70,19 +70,16 @@ public class BookingRepository
     {
         var bookingsCount = await _context.Bookings.CountAsync();
         var bookingsGroupedByStatus = await _context.Bookings.GroupBy(b => b.Status)
-            .Select(g => new StatusCount()
-            {
-                Count = g.Count(), Status = g.Key
-            })
+            .Select(g => new StatusCount {Count = g.Count(), Status = g.Key})
             .ToListAsync();
 
         var top5MostPopularResources = await _context.Bookings.GroupBy(b => b.ResourceId)
             .OrderByDescending(b => b.Count())
-            .Select(g => new
-                ResourceCount() {BookingCount = g.Count(), ResourceId = g.Key})
+            .Select(g => new ResourceCount {BookingCount = g.Count(), ResourceId = g.Key})
+            .Take(5)
             .ToListAsync();
 
-        return new StatisticsResponse()
+        return new StatisticsResponse
         {
             ByStatus = bookingsGroupedByStatus, TopResources = top5MostPopularResources, TotalCount = bookingsCount
         };
