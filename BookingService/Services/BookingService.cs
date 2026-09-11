@@ -178,7 +178,6 @@ public class BookingService
             booking.Id, booking.Status);
     }
 
-    // TODO: Task 01 — откат отмены бронирования (компенсирующая транзакция)
     public async Task HandleCancellationError(Guid requestId)
     {
         _logger.LogWarning("Произошла ошибка отмены бронирования: requestId={RequestId}", requestId);

@@ -15,8 +15,6 @@ public class Booking
     public DateOnly BookedTo { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public Guid? CatalogRequestId { get; private set; }
-
-    // TODO: Task 01 — время, когда была запрошена отмена подтверждённого бронирования
     public DateTimeOffset? CancellationRequestedAt { get; private set; }
 
     // TODO: Task 03 — версия для оптимистичной блокировки (EF Core xmin)
@@ -107,7 +105,6 @@ public class Booking
         }
     }
 
-    // TODO: Task 01 — завершить отмену: CancellationPending → Cancelled
     public void CompleteCancellation()
     {
         if (Status != BookingStatus.CancellationPending)
@@ -117,7 +114,6 @@ public class Booking
         CancellationRequestedAt = null;
     }
 
-    // TODO: Task 01 — откатить отмену: CancellationPending → Confirmed (при ошибке DLQ)
     public void RollbackCancellation()
     {
         if (Status != BookingStatus.CancellationPending)
