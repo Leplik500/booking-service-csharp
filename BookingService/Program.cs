@@ -47,7 +47,6 @@ builder.Services.AddSingleton<ICurrentDateTimeProvider, CurrentDateTimeProvider>
 // ---- Messaging (Rebus + RabbitMQ) ----
 builder.Services.AddSingleton(rabbitMqSettings);
 builder.Services.AddScoped<BookingEventPublisher>();
-
 builder.Services.AddRebus(
     configure => configure
         .Transport(t => t
