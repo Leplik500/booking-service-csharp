@@ -27,7 +27,9 @@ public class BookingController : ControllerBase
     [HttpPost]
     [ProducesResponseType<long>(StatusCodes.Status200OK)]
     public async Task<long> Create([FromBody] CreateBookingRequest request)
-        => await _bookingService.CreateBooking(request.UserId, request.ResourceId, request.BookedFrom, request.BookedTo);
+    {
+        return await _bookingService.CreateBooking(request.UserId, request.ResourceId, request.BookedFrom, request.BookedTo);
+    }
 
     /// <summary>Получить бронирование по ID</summary>
     [HttpGet("{id:long}")]
@@ -58,16 +60,23 @@ public class BookingController : ControllerBase
     [HttpGet("{id:long}/status")]
     [ProducesResponseType<BookingStatus>(StatusCodes.Status200OK)]
     public async Task<BookingStatus?> GetStatus([FromRoute] long id)
-        => await _bookingService.GetStatusById(id);
+    {
+        return await _bookingService.GetStatusById(id);
+    }
 
     /// <summary>Отменить бронирование</summary>
     [HttpPost("{id:long}/cancel")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task Cancel([FromRoute] long id)
-        => await _bookingService.CancelBooking(id);
+    {
+        await _bookingService.CancelBooking(id);
+    }
 
     /// <summary>Получить общее количество бронирований, группировку бронировний по статусам, 5 самых популярных ресурсов</summary>
     [HttpGet("/api/bookings/statistics")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<StatisticsResponse> GetStatistics() => await _bookingService.GetStatistics();
+    [ProducesResponseType<StatisticsResponse>(StatusCodes.Status200OK)]
+    public async Task<StatisticsResponse> GetStatistics()
+    {
+        return await _bookingService.GetStatistics();
+    }
 }
