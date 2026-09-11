@@ -90,7 +90,11 @@ public class Booking
                 // отменяем немедленно, откат не нужен
                 Status = BookingStatus.Cancelled;
                 break;
-
+            case BookingStatus.Confirmed:
+                Status = BookingStatus.CancellationPending;
+                CancellationRequestedAt = DateTimeOffset.UtcNow;
+                break;
+            case BookingStatus.CancellationPending:
             case BookingStatus.None:
             case BookingStatus.Cancelled:
             default:
@@ -99,8 +103,32 @@ public class Booking
     }
 
     // TODO: Task 01 — завершить отмену: CancellationPending → Cancelled
-    public void CompleteCancellation() => throw new NotImplementedException();
+    public void CompleteCancellation()
+    {
+        if (Status != BookingStatus.CancellationPending)
+            throw new BusinessException("Некорректный статус для завершения отмены");
+            
+        Status = BookingStatus.Cancelled;
+        CancellationRequestedAt = null;
+    }
 
     // TODO: Task 01 — откатить отмену: CancellationPending → Confirmed (при ошибке DLQ)
-    public void RollbackCancellation() => throw new NotImplementedException();
+    public void RollbackCancellation()
+    {
+        switch (Status)
+        {
+            case BookingStatus.CancellationPending:
+                Status = BookingStatus.Confirmed;
+                break;
+            case BookingStatus.Confirmed:
+                break;
+            case BookingStatus.None:
+            case BookingStatus.AwaitConfirmation:
+            case BookingStatus.Cancelled:
+            default:
+                throw new BusinessException("Некорректный статус для отката отмены");
+        }
+
+        CancellationRequestedAt = null;
+    }
 }
