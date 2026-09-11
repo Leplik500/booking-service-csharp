@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    [Migration("20260911125032_CancellationRequestedAt")]
+    [Migration("20260911132533_CancellationRequestedAt")]
     partial class CancellationRequestedAt
     {
         /// <inheritdoc />
@@ -65,9 +65,6 @@ namespace BookingService.Infrastructure.Data.Migrations
                     b.Property<long>("UserId")
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");
-
-                    b.Property<long>("Version")
-                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
