@@ -60,14 +60,13 @@ public class BookingDbContext : DbContext
                 .Property(b => b.CancellationRequestedAt)
                 .HasColumnName("cancellation_requested_at");
 
-            entity.HasIndex(b => b.Status).HasDatabaseName("idx_bookings_status");
-
-            entity.HasIndex(b => b.UserId).HasDatabaseName("idx_bookings_user_id");
+            entity.HasIndex(b => b.Status, "idx_bookings_status");
 
             entity
-                .HasIndex(b => b.Status)
-                .HasDatabaseName("idx_bookings_cancellation_pending")
+                .HasIndex(b => b.Status, "idx_bookings_cancellation_pending")
                 .HasFilter("status = 4");
+
+            entity.HasIndex(b => b.UserId, "idx_bookings_user_id");
 
             entity.HasIndex(b => b.ResourceId).HasDatabaseName("idx_bookings_resource_id");
 

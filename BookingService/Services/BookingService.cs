@@ -184,7 +184,10 @@ public class BookingService
 
         if (booking.Status is BookingStatus.CancellationPending)
         {
-            _logger.LogWarning("Бронирование с {id} было отменено", booking.Id);
+            _logger.LogWarning(
+                "Бронирование id={Id} в статусе CancellationPending — BookingJobConfirmed проигнорировано (race condition)",
+                booking.Id
+            );
             return;
         }
 
@@ -201,6 +204,8 @@ public class BookingService
             booking.Id,
             booking.Status
         );
+
+        await _repository.SaveAsync(booking);
     }
 
     /// <summary>

@@ -80,6 +80,8 @@ public class BookingRepository
 
             if (booking.Id == 0)
                 _context.Bookings.Add(booking);
+
+            await _context.SaveChangesAsync();
         }
     }
 
@@ -113,6 +115,11 @@ public class BookingRepository
         DateTimeOffset cancellationRequestedBefore
     )
     {
-        throw new NotImplementedException();
+        return _context
+            .Bookings.Where(b =>
+                b.Status == BookingStatus.CancellationPending
+                && b.CancellationRequestedAt < cancellationRequestedBefore
+            )
+            .ToListAsync();
     }
 }

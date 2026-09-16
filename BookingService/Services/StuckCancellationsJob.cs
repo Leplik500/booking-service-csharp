@@ -1,7 +1,9 @@
 using BookingService.Configuration;
 using BookingService.Entities;
+using BookingService.Infrastructure.Data;
 using BookingService.Infrastructure.Messaging;
 using BookingService.Infrastructure.Messaging.Contracts;
+using RabbitMQ.Client.Exceptions;
 
 namespace BookingService.Services;
 
@@ -21,51 +23,49 @@ public class StuckCancellationsJob : BackgroundService
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
             using var scope = _scopeFactory.CreateScope();
-            var bookingService = scope.ServiceProvider.GetRequiredService<BookingService>();
+            var bookingRepository = scope.ServiceProvider.GetRequiredService<BookingRepository>();
             var dateTimeProvider =
-                scope.ServiceProvider.GetRequiredService<CurrentDateTimeProvider>();
+                scope.ServiceProvider.GetRequiredService<ICurrentDateTimeProvider>();
+
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<StuckCancellationsJob>>();
 
             var publisher = scope.ServiceProvider.GetRequiredService<BookingEventPublisher>();
 
-            var cancellingBookings = await GetAllCancellingBookings(bookingService);
+            var cancellingBookings = await bookingRepository.FindStuckCancellationsAsync(
+                dateTimeProvider.UtcNow()
+            );
+
+            logger.LogWarning("Найдено {count} зависших отмен", cancellingBookings.Count);
             foreach (
                 var booking in cancellingBookings.Where(booking =>
-                    dateTimeProvider.UtcNow() - booking.CreatedAt > TimeSpan.FromMinutes(5)
+                    dateTimeProvider.UtcNow() - booking.CancellationRequestedAt
+                    > TimeSpan.FromMinutes(5)
                 )
             )
             {
-                await publisher.PublishCancelBookingJob(
-                    new CancelBookingJobByRequestIdRequest
-                    {
-                        EventId = Guid.Empty,
-                        RequestId = (Guid)booking.CatalogRequestId!,
-                    }
-                );
+                if (booking.CatalogRequestId == null)
+                    continue;
+
+                try
+                {
+                    await publisher.PublishCancelBookingJob(
+                        new CancelBookingJobByRequestIdRequest
+                        {
+                            EventId = Guid.NewGuid(),
+                            RequestId = (Guid)booking.CatalogRequestId,
+                        }
+                    );
+                    logger.LogWarning(
+                        "Бронирование {requestId} было отменено заново",
+                        booking.CatalogRequestId
+                    );
+                }
+                catch (BrokerUnreachableException e)
+                {
+                    logger.LogError(e, "Произошла ошибка при повторной отмене зависшего запроса");
+                    throw;
+                }
             }
         }
-    }
-
-    private static async Task<List<Booking>> GetAllCancellingBookings(BookingService bookingService)
-    {
-        var allBookings = new List<Booking>();
-        var page = 1;
-        const int pageSize = 100;
-        List<Booking> current;
-
-        do
-        {
-            current = await bookingService.GetByFilter(
-                null,
-                null,
-                BookingStatus.CancellationPending,
-                page,
-                pageSize
-            );
-
-            allBookings.AddRange(current);
-            page++;
-        } while (current.Count == pageSize);
-
-        return allBookings;
     }
 }
