@@ -23,7 +23,9 @@ public class BookingRepository
 
     public async Task<Booking?> FindByCatalogRequestIdAsync(Guid catalogRequestId)
     {
-        return await _context.Bookings.FirstOrDefaultAsync(b => b.CatalogRequestId == catalogRequestId);
+        return await _context.Bookings.FirstOrDefaultAsync(b =>
+            b.CatalogRequestId == catalogRequestId
+        );
     }
 
     /// <summary>
@@ -34,7 +36,8 @@ public class BookingRepository
         long? resourceId,
         BookingStatus? status,
         int pageNumber,
-        int pageSize)
+        int pageSize
+    )
     {
         var query = _context.Bookings.AsQueryable();
 
@@ -47,10 +50,7 @@ public class BookingRepository
         if (status.HasValue)
             query = query.Where(b => b.Status == status.Value);
 
-        return await query
-            .Skip(pageNumber * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+        return await query.Skip(pageNumber * pageSize).Take(pageSize).ToListAsync();
     }
 
     /// <summary>
@@ -58,9 +58,9 @@ public class BookingRepository
     /// </summary>
     public async Task<BookingStatus?> FindStatusByIdAsync(long id)
     {
-        return await _context.Bookings
-            .Where(b => b.Id == id)
-            .Select(b => (BookingStatus?) b.Status)
+        return await _context
+            .Bookings.Where(b => b.Id == id)
+            .Select(b => (BookingStatus?)b.Status)
             .FirstOrDefaultAsync();
     }
 
@@ -69,37 +69,49 @@ public class BookingRepository
         if (booking.Id == 0)
             _context.Bookings.Add(booking);
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            foreach (var entry in exception.Entries)
+                await entry.ReloadAsync();
+
+            if (booking.Id == 0)
+                _context.Bookings.Add(booking);
+        }
     }
 
     public async Task<StatisticsResponse> GetStatisticsAsync()
     {
         var bookingsCount = await _context.Bookings.CountAsync();
-        var bookingsGroupedByStatus = await _context.Bookings
-            .GroupBy(b => b.Status)
-            .Select(g => new StatusCount
-            {
-                Count = g.Count(),
-                Status = g.Key
-            })
+        var bookingsGroupedByStatus = await _context
+            .Bookings.GroupBy(b => b.Status)
+            .Select(g => new StatusCount { Count = g.Count(), Status = g.Key })
             .ToListAsync();
 
         const int topResourcesLimit = 5;
 
-        var mostPopularResources = await _context.Bookings.GroupBy(b => b.ResourceId)
+        var mostPopularResources = await _context
+            .Bookings.GroupBy(b => b.ResourceId)
             .OrderByDescending(b => b.Count())
-            .Select(g => new ResourceCount {BookingCount = g.Count(), ResourceId = g.Key})
+            .Select(g => new ResourceCount { BookingCount = g.Count(), ResourceId = g.Key })
             .Take(topResourcesLimit)
             .ToListAsync();
 
         return new StatisticsResponse
         {
-            ByStatus = bookingsGroupedByStatus, TopResources = mostPopularResources, TotalCount = bookingsCount
+            ByStatus = bookingsGroupedByStatus,
+            TopResources = mostPopularResources,
+            TotalCount = bookingsCount,
         };
     }
 
     // TODO: Task 03 — найти бронирования, застрявшие в CancellationPending
-    public Task<List<Booking>> FindStuckCancellationsAsync(DateTimeOffset cancellationRequestedBefore)
+    public Task<List<Booking>> FindStuckCancellationsAsync(
+        DateTimeOffset cancellationRequestedBefore
+    )
     {
         throw new NotImplementedException();
     }

@@ -3,6 +3,7 @@ using System;
 using BookingService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    partial class BookingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260916155253_AddBookingVersion")]
+    partial class AddBookingVersion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,8 +78,7 @@ namespace BookingService.Infrastructure.Data.Migrations
                         .HasDatabaseName("idx_bookings_resource_id");
 
                     b.HasIndex("Status")
-                        .HasDatabaseName("idx_bookings_cancellation_pending")
-                        .HasFilter("status = 4");
+                        .HasDatabaseName("idx_bookings_status");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("idx_bookings_user_id");
