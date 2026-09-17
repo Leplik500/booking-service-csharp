@@ -32,16 +32,11 @@ public class StuckCancellationsJob : BackgroundService
             var publisher = scope.ServiceProvider.GetRequiredService<BookingEventPublisher>();
 
             var cancellingBookings = await bookingRepository.FindStuckCancellationsAsync(
-                dateTimeProvider.UtcNow()
+                dateTimeProvider.UtcNow() - TimeSpan.FromMinutes(5)
             );
 
             logger.LogWarning("Найдено {count} зависших отмен", cancellingBookings.Count);
-            foreach (
-                var booking in cancellingBookings.Where(booking =>
-                    dateTimeProvider.UtcNow() - booking.CancellationRequestedAt
-                    > TimeSpan.FromMinutes(5)
-                )
-            )
+            foreach (var booking in cancellingBookings)
             {
                 if (booking.CatalogRequestId == null)
                     continue;
@@ -55,6 +50,7 @@ public class StuckCancellationsJob : BackgroundService
                             RequestId = (Guid)booking.CatalogRequestId,
                         }
                     );
+
                     logger.LogWarning(
                         "Бронирование {requestId} было отменено заново",
                         booking.CatalogRequestId
@@ -63,7 +59,6 @@ public class StuckCancellationsJob : BackgroundService
                 catch (BrokerUnreachableException e)
                 {
                     logger.LogError(e, "Произошла ошибка при повторной отмене зависшего запроса");
-                    throw;
                 }
             }
         }

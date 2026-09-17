@@ -11,17 +11,20 @@ namespace BookingService.Infrastructure.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateIndex(
-                name: "idx_bookings_status",
+                name: "idx_bookings_cancellation_pending",
                 table: "bookings",
-                column: "status");
+                column: "status",
+                filter: "status = 4"
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
-                name: "idx_bookings_status",
-                table: "bookings");
+                name: "idx_bookings_cancellation_pending",
+                table: "bookings"
+            );
         }
     }
 }

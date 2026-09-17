@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    [Migration("20260916190541_AddCancellationPendingPartialIndex")]
+    [Migration("20260917122624_AddCancellationPendingPartialIndex")]
     partial class AddCancellationPendingPartialIndex
     {
         /// <inheritdoc />

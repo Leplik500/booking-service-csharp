@@ -69,20 +69,7 @@ public class BookingRepository
         if (booking.Id == 0)
             _context.Bookings.Add(booking);
 
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException exception)
-        {
-            foreach (var entry in exception.Entries)
-                await entry.ReloadAsync();
-
-            if (booking.Id == 0)
-                _context.Bookings.Add(booking);
-
-            await _context.SaveChangesAsync();
-        }
+        await _context.SaveChangesAsync();
     }
 
     public async Task<StatisticsResponse> GetStatisticsAsync()
