@@ -3,6 +3,7 @@ using System;
 using BookingService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    partial class BookingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260917122624_AddCancellationPendingPartialIndex")]
+    partial class AddCancellationPendingPartialIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -82,31 +85,6 @@ namespace BookingService.Infrastructure.Data.Migrations
                     b.HasIndex(new[] { "UserId" }, "idx_bookings_user_id");
 
                     b.ToTable("bookings", (string)null);
-                });
-
-            modelBuilder.Entity("BookingService.Entities.BookingStatusHistory", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("BookingId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("StatusFrom")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("StatusTo")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("BookingStatusHistory");
                 });
 #pragma warning restore 612, 618
         }
