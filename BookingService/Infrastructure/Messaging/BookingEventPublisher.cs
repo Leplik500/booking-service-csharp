@@ -41,7 +41,7 @@ public class BookingEventPublisher
     /// </summary>
     public async Task PublishCancelBookingJob(
         CancelBookingJobByRequestIdRequest request,
-        CancellationToken stoppingToken
+        CancellationToken stoppingToken = default
     )
     {
         _logger.LogInformation(
@@ -50,21 +50,6 @@ public class BookingEventPublisher
         );
 
         stoppingToken.ThrowIfCancellationRequested();
-        await _bus.Publish(request);
-
-        _logger.LogInformation("Команда CancelBookingJob отправлена в RabbitMQ");
-    }
-
-    /// <summary>
-    /// Публикует команду отмены booking job в Catalog Service
-    /// </summary>
-    public async Task PublishCancelBookingJob(CancelBookingJobByRequestIdRequest request)
-    {
-        _logger.LogInformation(
-            "Публикация команды CancelBookingJob: requestId={RequestId}",
-            request.RequestId
-        );
-
         await _bus.Publish(request);
 
         _logger.LogInformation("Команда CancelBookingJob отправлена в RabbitMQ");

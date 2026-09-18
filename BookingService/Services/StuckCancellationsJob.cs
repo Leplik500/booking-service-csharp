@@ -1,49 +1,51 @@
 using BookingService.Configuration;
-using BookingService.Entities;
 using BookingService.Infrastructure.Data;
 using BookingService.Infrastructure.Messaging;
 using BookingService.Infrastructure.Messaging.Contracts;
-using RabbitMQ.Client.Exceptions;
 
 namespace BookingService.Services;
 
 public class StuckCancellationsJob : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<StuckCancellationsJob> _logger;
 
-    public StuckCancellationsJob(IServiceScopeFactory scopeFactory)
+    public StuckCancellationsJob(
+        IServiceScopeFactory scopeFactory,
+        ILogger<StuckCancellationsJob> logger
+    )
     {
         _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
-        using var scope = _scopeFactory.CreateScope();
-        var bookingRepository = scope.ServiceProvider.GetRequiredService<BookingRepository>();
-        var dateTimeProvider = scope.ServiceProvider.GetRequiredService<ICurrentDateTimeProvider>();
-
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<StuckCancellationsJob>>();
-
-        var publisher = scope.ServiceProvider.GetRequiredService<BookingEventPublisher>();
+        var interval = TimeSpan.FromMinutes(1);
+        using var timer = new PeriodicTimer(interval);
 
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            try
+            using var scope = _scopeFactory.CreateScope();
+            var bookingRepository = scope.ServiceProvider.GetRequiredService<BookingRepository>();
+            var dateTimeProvider =
+                scope.ServiceProvider.GetRequiredService<ICurrentDateTimeProvider>();
+
+            var publisher = scope.ServiceProvider.GetRequiredService<BookingEventPublisher>();
+
+            var stuckTimeout = dateTimeProvider.UtcNow() - TimeSpan.FromMinutes(5);
+            var cancellingBookings = await bookingRepository.FindStuckCancellationsAsync(
+                stuckTimeout,
+                stoppingToken
+            );
+
+            var cancellingBookingsCount = cancellingBookings.Count;
+            if (cancellingBookingsCount > 0)
+                _logger.LogInformation("Найдено {count} зависших отмен", cancellingBookingsCount);
+
+            foreach (var booking in cancellingBookings)
             {
-                var cancellingBookings = await bookingRepository.FindStuckCancellationsAsync(
-                    dateTimeProvider.UtcNow() - TimeSpan.FromMinutes(5),
-                    stoppingToken
-                );
-
-                var cancellingBookingsCount = cancellingBookings.Count;
-                if (cancellingBookingsCount > 0)
-                    logger.LogInformation(
-                        "Найдено {count} зависших отмен",
-                        cancellingBookingsCount
-                    );
-
-                foreach (var booking in cancellingBookings)
+                try
                 {
                     if (booking.CatalogRequestId == null)
                         continue;
@@ -57,20 +59,22 @@ public class StuckCancellationsJob : BackgroundService
                         stoppingToken
                     );
 
-                    logger.LogInformation(
+                    _logger.LogInformation(
                         "Бронирование {requestId} было отменено заново",
                         booking.CatalogRequestId
                     );
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                logger.LogInformation("Запрос был отменён");
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Призошла ошибка");
-                throw;
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation(
+                        "Повторный запрос отмены бронирования {requestId} был отменён",
+                        booking.CatalogRequestId
+                    );
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Произошла ошибка: {Message}", e.Message);
+                }
             }
         }
     }

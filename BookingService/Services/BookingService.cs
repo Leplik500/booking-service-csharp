@@ -206,6 +206,13 @@ public class BookingService
 
                 return;
             case BookingStatus.None:
+                _logger.LogWarning(
+                    "Бронирование id={Id} в статусе None — BookingJobConfirmed проигнорировано",
+                    booking.Id
+                );
+
+                return;
+
             case BookingStatus.AwaitConfirmation:
                 break;
             default:
@@ -224,23 +231,37 @@ public class BookingService
             {
                 booking.Confirm();
                 await _repository.SaveAsync(booking);
+                _logger.LogInformation(
+                    "Бронирование успешно подтверждено: id={Id}, новый статус={Status}",
+                    booking.Id,
+                    booking.Status
+                );
+
                 break;
             }
             catch (DbUpdateConcurrencyException e)
             {
-                await e.Entries[0].ReloadAsync();
-                if (booking.Status == BookingStatus.CancellationPending)
-                    _logger.LogWarning(
-                        "Бронирование не подтвеждено: id={Id}, статус=CancellationPending",
-                        booking.Id
+                if (i == maxTries - 1)
+                {
+                    _logger.LogError(
+                        e,
+                        "Произошла ошибка при подтверждении бронирования: {Message}",
+                        e.Message
                     );
-            }
 
-        _logger.LogInformation(
-            "Бронирование успешно подтверждено: id={Id}, новый статус={Status}",
-            booking.Id,
-            booking.Status
-        );
+                    throw;
+                }
+
+                await e.Entries[0].ReloadAsync();
+                if (booking.Status != BookingStatus.CancellationPending)
+                    continue;
+
+                _logger.LogWarning(
+                    "Бронирование не подтвеждено: id={Id}, статус=CancellationPending",
+                    booking.Id
+                );
+                return;
+            }
     }
 
     /// <summary>
