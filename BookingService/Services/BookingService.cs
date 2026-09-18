@@ -253,13 +253,14 @@ public class BookingService
                 }
 
                 await e.Entries[0].ReloadAsync();
-                if (booking.Status != BookingStatus.CancellationPending)
+                if (booking.Status == BookingStatus.AwaitConfirmation)
                     continue;
 
                 _logger.LogWarning(
                     "Бронирование не подтвеждено: id={Id}, статус=CancellationPending",
                     booking.Id
                 );
+
                 return;
             }
     }
