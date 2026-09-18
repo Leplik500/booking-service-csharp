@@ -189,16 +189,24 @@ public class BookingService
                     "Бронирование id={Id} в статусе Confirmed — BookingJobConfirmed проигнорировано",
                     booking.Id
                 );
+
                 return;
             case BookingStatus.CancellationPending:
                 _logger.LogWarning(
                     "Бронирование id={Id} в статусе CancellationPending — BookingJobConfirmed проигнорировано (race condition)",
                     booking.Id
                 );
+
+                return;
+            case BookingStatus.Cancelled:
+                _logger.LogWarning(
+                    "Бронирование id={Id} в статусе Cancelled — BookingJobConfirmed проигнорировано",
+                    booking.Id
+                );
+
                 return;
             case BookingStatus.None:
             case BookingStatus.AwaitConfirmation:
-            case BookingStatus.Cancelled:
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(booking.Status));
@@ -210,9 +218,23 @@ public class BookingService
             booking.Status
         );
 
-        booking.Confirm();
-
-        await _repository.SaveAsync(booking);
+        const int maxTries = 3;
+        for (var i = 0; i < maxTries; i++)
+            try
+            {
+                booking.Confirm();
+                await _repository.SaveAsync(booking);
+                break;
+            }
+            catch (DbUpdateConcurrencyException e)
+            {
+                await e.Entries[0].ReloadAsync();
+                if (booking.Status == BookingStatus.CancellationPending)
+                    _logger.LogWarning(
+                        "Бронирование не подтвеждено: id={Id}, статус=CancellationPending",
+                        booking.Id
+                    );
+            }
 
         _logger.LogInformation(
             "Бронирование успешно подтверждено: id={Id}, новый статус={Status}",

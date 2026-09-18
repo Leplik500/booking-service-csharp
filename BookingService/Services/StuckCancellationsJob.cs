@@ -19,47 +19,58 @@ public class StuckCancellationsJob : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        using var scope = _scopeFactory.CreateScope();
+        var bookingRepository = scope.ServiceProvider.GetRequiredService<BookingRepository>();
+        var dateTimeProvider = scope.ServiceProvider.GetRequiredService<ICurrentDateTimeProvider>();
+
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<StuckCancellationsJob>>();
+
+        var publisher = scope.ServiceProvider.GetRequiredService<BookingEventPublisher>();
 
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            using var scope = _scopeFactory.CreateScope();
-            var bookingRepository = scope.ServiceProvider.GetRequiredService<BookingRepository>();
-            var dateTimeProvider =
-                scope.ServiceProvider.GetRequiredService<ICurrentDateTimeProvider>();
-
-            var logger = scope.ServiceProvider.GetRequiredService<ILogger<StuckCancellationsJob>>();
-
-            var publisher = scope.ServiceProvider.GetRequiredService<BookingEventPublisher>();
-
-            var cancellingBookings = await bookingRepository.FindStuckCancellationsAsync(
-                dateTimeProvider.UtcNow() - TimeSpan.FromMinutes(5)
-            );
-
-            logger.LogWarning("Найдено {count} зависших отмен", cancellingBookings.Count);
-            foreach (var booking in cancellingBookings)
+            try
             {
-                if (booking.CatalogRequestId == null)
-                    continue;
+                var cancellingBookings = await bookingRepository.FindStuckCancellationsAsync(
+                    dateTimeProvider.UtcNow() - TimeSpan.FromMinutes(5),
+                    stoppingToken
+                );
 
-                try
+                var cancellingBookingsCount = cancellingBookings.Count;
+                if (cancellingBookingsCount > 0)
+                    logger.LogInformation(
+                        "Найдено {count} зависших отмен",
+                        cancellingBookingsCount
+                    );
+
+                foreach (var booking in cancellingBookings)
                 {
+                    if (booking.CatalogRequestId == null)
+                        continue;
+
                     await publisher.PublishCancelBookingJob(
                         new CancelBookingJobByRequestIdRequest
                         {
                             EventId = Guid.NewGuid(),
                             RequestId = (Guid)booking.CatalogRequestId,
-                        }
+                        },
+                        stoppingToken
                     );
 
-                    logger.LogWarning(
+                    logger.LogInformation(
                         "Бронирование {requestId} было отменено заново",
                         booking.CatalogRequestId
                     );
                 }
-                catch (BrokerUnreachableException e)
-                {
-                    logger.LogError(e, "Произошла ошибка при повторной отмене зависшего запроса");
-                }
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogInformation("Запрос был отменён");
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Призошла ошибка");
+                throw;
             }
         }
     }

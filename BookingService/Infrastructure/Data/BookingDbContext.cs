@@ -70,7 +70,12 @@ public class BookingDbContext : DbContext
 
             entity.HasIndex(b => b.ResourceId).HasDatabaseName("idx_bookings_resource_id");
 
-            entity.Property(b => b.Version).IsRowVersion();
+            entity
+                .Property(b => b.Version)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
     }
 }
