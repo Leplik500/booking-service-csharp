@@ -64,6 +64,10 @@ public class BookingRepository
             .FirstOrDefaultAsync();
     }
 
+    /// <summary>
+    /// Сохранить изменения в бронировании
+    /// </summary>
+    /// <param name="booking">Бронирование</param>
     public async Task SaveAsync(Booking booking)
     {
         if (booking.Id == 0)
@@ -72,6 +76,10 @@ public class BookingRepository
         await _context.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Получить статистику по бронированиям
+    /// </summary>
+    /// <returns>StaticsResponse</returns>
     public async Task<StatisticsResponse> GetStatisticsAsync()
     {
         var bookingsCount = await _context.Bookings.CountAsync();
@@ -97,6 +105,12 @@ public class BookingRepository
         };
     }
 
+    /// <summary>
+    ///  Найти зависшие отмены
+    /// </summary>
+    /// <param name="cancellationRequestedBefore"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task<List<Booking>> FindStuckCancellationsAsync(
         DateTimeOffset cancellationRequestedBefore,
         CancellationToken cancellationToken
@@ -107,6 +121,17 @@ public class BookingRepository
                 b.Status == BookingStatus.CancellationPending
                 && b.CancellationRequestedAt < cancellationRequestedBefore
             )
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<BookingStatusHistory>> GetBookingHistoryAsync(
+        long bookingId,
+        CancellationToken cancellationToken
+    )
+    {
+        return await _context
+            .BookingStatusHistory.Where(bh => bh.BookingId == bookingId)
+            .OrderBy(bh => bh.ChangedAt)
             .ToListAsync(cancellationToken);
     }
 }

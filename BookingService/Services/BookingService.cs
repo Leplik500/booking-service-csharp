@@ -304,6 +304,10 @@ public class BookingService
         );
     }
 
+    /// <summary>
+    /// Обработать ошибку при отмене
+    /// </summary>
+    /// <param name="requestId"></param>
     public async Task HandleCancellationError(Guid requestId)
     {
         _logger.LogWarning(
@@ -354,9 +358,12 @@ public class BookingService
         return HandleCancellationError(requestId);
     }
 
-    // TODO: Task 04 — возвращать историю изменений статусов для указанного бронирования
-    public Task<List<BookingStatusHistory>> GetBookingHistory(long bookingId)
+    /// <summary>Вернуть историю изменений статусов для указанного бронирования</summary>
+    public async Task<List<BookingStatusHistory>> GetBookingHistory(
+        long bookingId,
+        CancellationToken cancellationToken
+    )
     {
-        throw new NotImplementedException();
+        return await _repository.GetBookingHistoryAsync(bookingId, cancellationToken);
     }
 }

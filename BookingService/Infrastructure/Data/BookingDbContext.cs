@@ -10,6 +10,11 @@ public class BookingDbContext : DbContext
         get => Set<Booking>();
     }
 
+    public DbSet<BookingStatusHistory> BookingStatusHistory
+    {
+        get => Set<BookingStatusHistory>();
+    }
+
     public BookingDbContext(DbContextOptions<BookingDbContext> options)
         : base(options) { }
 
@@ -77,5 +82,40 @@ public class BookingDbContext : DbContext
                 .ValueGeneratedOnAddOrUpdate()
                 .IsConcurrencyToken();
         });
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var entries = ChangeTracker.Entries<Booking>();
+
+        foreach (var entry in entries)
+        {
+            if (entry.State != EntityState.Modified)
+                continue;
+
+            var statusProperty = entry.Properties.FirstOrDefault(p =>
+                p.Metadata.Name == nameof(Booking.Status) && p.IsModified
+            );
+
+            if (statusProperty == null)
+                continue;
+
+            BookingStatus? oldStatus = (BookingStatus)(
+                statusProperty.OriginalValue ?? throw new InvalidOperationException()
+            );
+
+            var newStatus = (BookingStatus)(
+                statusProperty.CurrentValue ?? throw new InvalidOperationException()
+            );
+
+            var id = (long)(
+                entry.Property(nameof(Booking.Id)).CurrentValue
+                ?? throw new InvalidOperationException()
+            );
+
+            Entities.BookingStatusHistory.Create(id, oldStatus, newStatus);
+        }
+
+        return await base.SaveChangesAsync(cancellationToken);
     }
 }
