@@ -117,32 +117,18 @@ public class BookingDbContext : DbContext
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var entries = ChangeTracker.Entries<Booking>().ToList();
-        var pendingAdded = new List<(EntityEntry<Booking> Entry, BookingStatus NewStatus)>();
+        var modifiedEntries = new List<EntityEntry<Booking>>();
+        var addedEntries = new List<EntityEntry<Booking>>();
 
         foreach (var entry in entries)
         {
-            var statusProperty = entry.Property(b => b.Status);
-
             switch (entry.State)
             {
-                case EntityState.Modified when !statusProperty.IsModified:
-                    continue;
-                case EntityState.Modified:
-                {
-                    BookingStatus? oldStatus = statusProperty.OriginalValue;
-                    var newStatus = statusProperty.CurrentValue;
-
-                    var statusHistory = Entities.BookingStatusHistory.Create(
-                        entry.Entity.Id,
-                        oldStatus,
-                        newStatus
-                    );
-
-                    BookingStatusHistory.Add(statusHistory);
-                    break;
-                }
                 case EntityState.Added:
-                    pendingAdded.Add((entry, statusProperty.CurrentValue));
+                    addedEntries.Add(entry);
+                    break;
+                case EntityState.Modified when entry.Property(b => b.Status).IsModified:
+                    modifiedEntries.Add(entry);
                     break;
                 case EntityState.Detached:
                 case EntityState.Unchanged:
@@ -153,31 +139,38 @@ public class BookingDbContext : DbContext
         }
 
         if (Database.CurrentTransaction is not null)
-            return await base.SaveChangesAsync(cancellationToken);
+            return await SaveCoreAsync();
 
+        await using var tx = await Database.BeginTransactionAsync(cancellationToken);
+        var result = await SaveCoreAsync();
+        await tx.CommitAsync(cancellationToken);
+        return result;
+
+        async Task<int> SaveCoreAsync()
         {
-            await using var tx = await Database.BeginTransactionAsync(cancellationToken);
             var result = await base.SaveChangesAsync(cancellationToken);
 
-            if (pendingAdded.Count <= 0)
-            {
-                await tx.CommitAsync(cancellationToken);
-                return result;
-            }
-
-            foreach (var (entry, newStatus) in pendingAdded)
-            {
-                var statusHistory = Entities.BookingStatusHistory.Create(
+            var histories = (
+                from entry in modifiedEntries
+                let statusProperty = entry.Property(b => b.Status)
+                select Entities.BookingStatusHistory.Create(
                     entry.Entity.Id,
-                    null,
-                    newStatus
-                );
+                    statusProperty.OriginalValue,
+                    statusProperty.CurrentValue
+                )
+            ).ToList();
 
-                BookingStatusHistory.Add(statusHistory);
-            }
+            histories.AddRange(
+                addedEntries.Select(entry =>
+                    Entities.BookingStatusHistory.Create(entry.Entity.Id, null, entry.Entity.Status)
+                )
+            );
 
+            if (histories.Count <= 0)
+                return result;
+
+            Set<BookingStatusHistory>().AddRange(histories);
             await base.SaveChangesAsync(cancellationToken);
-            await tx.CommitAsync(cancellationToken);
 
             return result;
         }
