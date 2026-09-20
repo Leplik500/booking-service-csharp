@@ -4,9 +4,11 @@ using BookingService.Infrastructure.Data;
 using BookingService.Infrastructure.Messaging;
 using BookingService.Infrastructure.Messaging.Contracts;
 using BookingService.Mappers;
+using BookingService.Services;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using Rebus.Config;
 using Rebus.Routing.TypeBased;
 using Rebus.ServiceProvider;
@@ -14,28 +16,29 @@ using Rebus.ServiceProvider;
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- Configuration ----
-var rabbitMqSettings = builder.Configuration
-    .GetSection("RabbitMq")
-    .Get<RabbitMqSettings>()!;
+var rabbitMqSettings = builder.Configuration.GetSection("RabbitMq").Get<RabbitMqSettings>()!;
 
 // ---- Controllers & OpenAPI ----
-builder.Services.AddControllers()
+builder
+    .Services.AddControllers()
     .AddJsonOptions(options =>
     {
         // Сериализуем enum как строки (AwaitConfirmation вместо 1)
         options.JsonSerializerOptions.Converters.Add(
-            new System.Text.Json.Serialization.JsonStringEnumConverter());
+            new System.Text.Json.Serialization.JsonStringEnumConverter()
+        );
     });
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() { Title = "Booking Service", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Booking Service", Version = "v1" });
 });
 
 // ---- Database ----
 builder.Services.AddDbContext<BookingDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+);
 
 builder.Services.AddScoped<BookingRepository>();
 
@@ -43,26 +46,31 @@ builder.Services.AddScoped<BookingRepository>();
 builder.Services.AddScoped<BookingService.Services.BookingService>();
 builder.Services.AddScoped<BookingMapper>();
 builder.Services.AddSingleton<ICurrentDateTimeProvider, CurrentDateTimeProvider>();
+builder.Services.AddHostedService<StuckCancellationsJob>();
 
 // ---- Messaging (Rebus + RabbitMQ) ----
 builder.Services.AddSingleton(rabbitMqSettings);
 builder.Services.AddScoped<BookingEventPublisher>();
-
 builder.Services.AddRebus(
-    configure => configure
-        .Transport(t => t
-            .UseRabbitMq(rabbitMqSettings.ConnectionString, rabbitMqSettings.InputQueue)
-            .ExchangeNames(rabbitMqSettings.DirectExchange, rabbitMqSettings.TopicExchange))
-        .Routing(r => r.TypeBased()
-            .Map<CreateBookingJobRequest>(rabbitMqSettings.InputQueue)
-            .Map<CancelBookingJobByRequestIdRequest>(rabbitMqSettings.InputQueue)
-            .Map<BookingJobConfirmed>(rabbitMqSettings.InputQueue)
-            .Map<BookingJobDenied>(rabbitMqSettings.InputQueue)),
+    configure =>
+        configure
+            .Transport(t =>
+                t.UseRabbitMq(rabbitMqSettings.ConnectionString, rabbitMqSettings.InputQueue)
+                    .ExchangeNames(rabbitMqSettings.DirectExchange, rabbitMqSettings.TopicExchange)
+            )
+            .Routing(r =>
+                r.TypeBased()
+                    .Map<CreateBookingJobRequest>(rabbitMqSettings.InputQueue)
+                    .Map<CancelBookingJobByRequestIdRequest>(rabbitMqSettings.InputQueue)
+                    .Map<BookingJobConfirmed>(rabbitMqSettings.InputQueue)
+                    .Map<BookingJobDenied>(rabbitMqSettings.InputQueue)
+            ),
     onCreated: async bus =>
     {
         await bus.Subscribe<BookingJobConfirmed>();
         await bus.Subscribe<BookingJobDenied>();
-    });
+    }
+);
 
 builder.Services.AddRebusHandler<BookingEventsHandler>();
 builder.Services.AddRebusHandler<CancelBookingErrorsHandler>();
@@ -94,7 +102,7 @@ app.UseExceptionHandler(exceptionApp =>
             {
                 Status = StatusCodes.Status400BadRequest,
                 Title = "Business Error",
-                Detail = businessEx.Message
+                Detail = businessEx.Message,
             };
 
             await context.Response.WriteAsJsonAsync(problem);
@@ -111,7 +119,7 @@ app.UseExceptionHandler(exceptionApp =>
             {
                 Status = StatusCodes.Status500InternalServerError,
                 Title = "Internal Server Error",
-                Detail = "An unexpected error occurred"
+                Detail = "An unexpected error occurred",
             };
 
             await context.Response.WriteAsJsonAsync(problem);

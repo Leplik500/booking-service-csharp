@@ -3,6 +3,7 @@ using System;
 using BookingService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    partial class BookingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911132533_CancellationRequestedAt")]
+    partial class CancellationRequestedAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -63,66 +66,18 @@ namespace BookingService.Infrastructure.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");
 
-                    b.Property<uint>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ResourceId")
                         .HasDatabaseName("idx_bookings_resource_id");
 
-                    b.HasIndex(new[] { "Status" }, "idx_bookings_cancellation_pending")
-                        .HasFilter("status = 4");
+                    b.HasIndex("Status")
+                        .HasDatabaseName("idx_bookings_status");
 
-                    b.HasIndex(new[] { "Status" }, "idx_bookings_status");
-
-                    b.HasIndex(new[] { "UserId" }, "idx_bookings_user_id");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_bookings_user_id");
 
                     b.ToTable("bookings", (string)null);
-                });
-
-            modelBuilder.Entity("BookingService.Entities.BookingStatusHistory", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("BookingId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("booking_id");
-
-                    b.Property<DateTimeOffset>("ChangedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("changed_at");
-
-                    b.Property<int?>("StatusFrom")
-                        .HasColumnType("integer")
-                        .HasColumnName("status_from");
-
-                    b.Property<int>("StatusTo")
-                        .HasColumnType("integer")
-                        .HasColumnName("status_to");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex(new[] { "BookingId" }, "idx_booking_status_history_booking_id");
-
-                    b.ToTable("booking_status_history", (string)null);
-                });
-
-            modelBuilder.Entity("BookingService.Entities.BookingStatusHistory", b =>
-                {
-                    b.HasOne("BookingService.Entities.Booking", null)
-                        .WithMany()
-                        .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

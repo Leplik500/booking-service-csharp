@@ -9,7 +9,8 @@ namespace BookingService.Mappers;
 public class BookingMapper
 {
     public BookingResponse ToResponse(Booking booking)
-        => new(
+    {
+        return new BookingResponse(
             booking.Id,
             booking.Status,
             booking.UserId,
@@ -18,7 +19,28 @@ public class BookingMapper
             booking.BookedTo,
             booking.CreatedAt
         );
+    }
 
     public List<BookingResponse> ToResponseList(List<Booking> bookings)
-        => bookings.Select(ToResponse).ToList();
+    {
+        return bookings.Select(ToResponse).ToList();
+    }
+
+    public BookingStatusHistoryResponse ToResponseHistory(BookingStatusHistory bookingStatusHistory)
+    {
+        return new BookingStatusHistoryResponse(
+            bookingStatusHistory.Id,
+            bookingStatusHistory.BookingId,
+            bookingStatusHistory.StatusFrom,
+            bookingStatusHistory.StatusTo,
+            bookingStatusHistory.ChangedAt
+        );
+    }
+
+    public List<BookingStatusHistoryResponse> ToResponseHistoryList(
+        List<BookingStatusHistory> bookingStatusHistory
+    )
+    {
+        return bookingStatusHistory.Select(ToResponseHistory).ToList();
+    }
 }
