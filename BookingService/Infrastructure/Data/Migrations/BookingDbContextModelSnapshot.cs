@@ -94,7 +94,7 @@ namespace BookingService.Infrastructure.Data.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<long>("BookingId")
-                        .HasColumnType("long")
+                        .HasColumnType("bigint")
                         .HasColumnName("booking_id");
 
                     b.Property<DateTimeOffset>("ChangedAt")

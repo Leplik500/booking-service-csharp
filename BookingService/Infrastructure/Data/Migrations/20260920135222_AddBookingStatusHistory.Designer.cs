@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    [Migration("20260920115937_AddBookingStatusHistory")]
+    [Migration("20260920135222_AddBookingStatusHistory")]
     partial class AddBookingStatusHistory
     {
         /// <inheritdoc />
@@ -97,7 +97,7 @@ namespace BookingService.Infrastructure.Data.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<long>("BookingId")
-                        .HasColumnType("long")
+                        .HasColumnType("bigint")
                         .HasColumnName("booking_id");
 
                     b.Property<DateTimeOffset>("ChangedAt")

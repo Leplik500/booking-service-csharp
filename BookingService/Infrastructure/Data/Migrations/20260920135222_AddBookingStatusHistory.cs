@@ -18,7 +18,7 @@ namespace BookingService.Infrastructure.Data.Migrations
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    booking_id = table.Column<long>(type: "long", nullable: false),
+                    booking_id = table.Column<long>(type: "bigint", nullable: false),
                     status_from = table.Column<int>(type: "integer", nullable: true),
                     status_to = table.Column<int>(type: "integer", nullable: false),
                     changed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)

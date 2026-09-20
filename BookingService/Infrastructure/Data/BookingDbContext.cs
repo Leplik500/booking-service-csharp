@@ -98,11 +98,7 @@ public class BookingDbContext : DbContext
 
             entity.Property(b => b.Id).HasColumnName("id").UseIdentityByDefaultColumn();
 
-            entity
-                .Property(b => b.BookingId)
-                .HasColumnName("booking_id")
-                .HasColumnType("long")
-                .IsRequired();
+            entity.Property(b => b.BookingId).HasColumnName("booking_id").IsRequired();
 
             entity
                 .Property(b => b.ChangedAt)
@@ -157,6 +153,7 @@ public class BookingDbContext : DbContext
             }
         }
 
+        await using var tx = await Database.BeginTransactionAsync(cancellationToken);
         var result = await base.SaveChangesAsync(cancellationToken);
 
         if (pendingAdded.Count <= 0)
@@ -173,7 +170,8 @@ public class BookingDbContext : DbContext
             BookingStatusHistory.Add(statusHistory);
         }
 
-        result += await base.SaveChangesAsync(cancellationToken);
+        await base.SaveChangesAsync(cancellationToken);
+        tx.CommitAsync(cancellationToken);
 
         return result;
     }

@@ -130,7 +130,8 @@ public class BookingRepository
     )
     {
         return await _context
-            .BookingStatusHistory.Where(bh => bh.BookingId == bookingId)
+            .BookingStatusHistory.AsNoTracking()
+            .Where(bh => bh.BookingId == bookingId)
             .OrderBy(bh => bh.ChangedAt)
             .ToListAsync(cancellationToken);
     }

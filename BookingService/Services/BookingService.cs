@@ -364,6 +364,7 @@ public class BookingService
         CancellationToken cancellationToken
     )
     {
+        await GetById(bookingId);
         return await _repository.GetBookingHistoryAsync(bookingId, cancellationToken);
     }
 }
