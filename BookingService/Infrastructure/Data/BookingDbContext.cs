@@ -1,5 +1,6 @@
 using BookingService.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace BookingService.Infrastructure.Data;
 
@@ -82,40 +83,98 @@ public class BookingDbContext : DbContext
                 .ValueGeneratedOnAddOrUpdate()
                 .IsConcurrencyToken();
         });
+
+        modelBuilder.Entity<BookingStatusHistory>(entity =>
+        {
+            entity.ToTable("booking_status_history");
+
+            entity
+                .HasOne<Booking>()
+                .WithMany()
+                .HasForeignKey(b => b.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasKey(b => b.Id);
+
+            entity.Property(b => b.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+
+            entity
+                .Property(b => b.BookingId)
+                .HasColumnName("booking_id")
+                .HasColumnType("long")
+                .IsRequired();
+
+            entity
+                .Property(b => b.ChangedAt)
+                .HasColumnName("changed_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.Property(b => b.StatusFrom).HasColumnName("status_from").IsRequired(false);
+
+            entity.Property(b => b.StatusTo).HasColumnName("status_to").IsRequired();
+
+            entity.HasIndex(b => b.BookingId, "idx_booking_status_history_booking_id");
+        });
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        var entries = ChangeTracker.Entries<Booking>();
+        var entries = ChangeTracker.Entries<Booking>().ToList();
+        var pendingAdded = new List<(EntityEntry<Booking> Entry, BookingStatus NewStatus)>();
 
         foreach (var entry in entries)
         {
-            if (entry.State != EntityState.Modified)
-                continue;
+            var statusProperty = entry.Property(b => b.Status);
 
-            var statusProperty = entry.Properties.FirstOrDefault(p =>
-                p.Metadata.Name == nameof(Booking.Status) && p.IsModified
-            );
+            switch (entry.State)
+            {
+                case EntityState.Modified when !statusProperty.IsModified:
+                    continue;
+                case EntityState.Modified:
+                {
+                    BookingStatus? oldStatus = statusProperty.OriginalValue;
+                    var newStatus = statusProperty.CurrentValue;
 
-            if (statusProperty == null)
-                continue;
+                    var statusHistory = Entities.BookingStatusHistory.Create(
+                        entry.Entity.Id,
+                        oldStatus,
+                        newStatus
+                    );
 
-            BookingStatus? oldStatus = (BookingStatus)(
-                statusProperty.OriginalValue ?? throw new InvalidOperationException()
-            );
-
-            var newStatus = (BookingStatus)(
-                statusProperty.CurrentValue ?? throw new InvalidOperationException()
-            );
-
-            var id = (long)(
-                entry.Property(nameof(Booking.Id)).CurrentValue
-                ?? throw new InvalidOperationException()
-            );
-
-            Entities.BookingStatusHistory.Create(id, oldStatus, newStatus);
+                    BookingStatusHistory.Add(statusHistory);
+                    break;
+                }
+                case EntityState.Added:
+                    pendingAdded.Add((entry, statusProperty.CurrentValue));
+                    break;
+                case EntityState.Detached:
+                case EntityState.Unchanged:
+                case EntityState.Deleted:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
 
-        return await base.SaveChangesAsync(cancellationToken);
+        var result = await base.SaveChangesAsync(cancellationToken);
+
+        if (pendingAdded.Count <= 0)
+            return result;
+
+        foreach (var (entry, newStatus) in pendingAdded)
+        {
+            var statusHistory = Entities.BookingStatusHistory.Create(
+                entry.Entity.Id,
+                null,
+                newStatus
+            );
+
+            BookingStatusHistory.Add(statusHistory);
+        }
+
+        result += await base.SaveChangesAsync(cancellationToken);
+
+        return result;
     }
 }

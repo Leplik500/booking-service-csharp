@@ -87,9 +87,18 @@ public class BookingController : ControllerBase
         return await _bookingService.GetStatistics();
     }
 
+    /// <summary>
+    /// Получить историю изменения статуса бронирования
+    /// </summary>
+    [ProducesResponseType<List<BookingStatusHistoryResponse>>(StatusCodes.Status200OK)]
     [HttpGet("{id:long}/history")]
-    public async Task<List<BookingStatusHistory>> GetHistory([FromRoute] long id)
+    public async Task<List<BookingStatusHistoryResponse>> GetHistory([FromRoute] long id)
     {
-        return await _bookingService.GetBookingHistory(id, HttpContext.RequestAborted);
+        var bookingHistory = await _bookingService.GetBookingHistory(
+            id,
+            HttpContext.RequestAborted
+        );
+
+        return _mapper.ToResponseHistoryList(bookingHistory);
     }
 }

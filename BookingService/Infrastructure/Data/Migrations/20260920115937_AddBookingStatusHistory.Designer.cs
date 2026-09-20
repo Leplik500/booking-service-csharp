@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    [Migration("20260918152623_AddBookingStatusHistory")]
+    [Migration("20260920115937_AddBookingStatusHistory")]
     partial class AddBookingStatusHistory
     {
         /// <inheritdoc />
@@ -91,25 +91,41 @@ namespace BookingService.Infrastructure.Data.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<long>("BookingId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("long")
+                        .HasColumnName("booking_id");
 
                     b.Property<DateTimeOffset>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
 
                     b.Property<int?>("StatusFrom")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("status_from");
 
                     b.Property<int>("StatusTo")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("status_to");
 
                     b.HasKey("Id");
 
-                    b.ToTable("BookingStatusHistory");
+                    b.HasIndex(new[] { "BookingId" }, "idx_booking_status_history_booking_id");
+
+                    b.ToTable("booking_status_history", (string)null);
+                });
+
+            modelBuilder.Entity("BookingService.Entities.BookingStatusHistory", b =>
+                {
+                    b.HasOne("BookingService.Entities.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }
