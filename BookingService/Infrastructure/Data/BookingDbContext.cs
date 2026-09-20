@@ -147,32 +147,39 @@ public class BookingDbContext : DbContext
                 case EntityState.Detached:
                 case EntityState.Unchanged:
                 case EntityState.Deleted:
-                    break;
                 default:
-                    throw new ArgumentOutOfRangeException();
+                    break;
             }
         }
 
-        await using var tx = await Database.BeginTransactionAsync(cancellationToken);
-        var result = await base.SaveChangesAsync(cancellationToken);
+        if (Database.CurrentTransaction is not null)
+            return await base.SaveChangesAsync(cancellationToken);
 
-        if (pendingAdded.Count <= 0)
-            return result;
-
-        foreach (var (entry, newStatus) in pendingAdded)
         {
-            var statusHistory = Entities.BookingStatusHistory.Create(
-                entry.Entity.Id,
-                null,
-                newStatus
-            );
+            await using var tx = await Database.BeginTransactionAsync(cancellationToken);
+            var result = await base.SaveChangesAsync(cancellationToken);
 
-            BookingStatusHistory.Add(statusHistory);
+            if (pendingAdded.Count <= 0)
+            {
+                await tx.CommitAsync(cancellationToken);
+                return result;
+            }
+
+            foreach (var (entry, newStatus) in pendingAdded)
+            {
+                var statusHistory = Entities.BookingStatusHistory.Create(
+                    entry.Entity.Id,
+                    null,
+                    newStatus
+                );
+
+                BookingStatusHistory.Add(statusHistory);
+            }
+
+            await base.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+
+            return result;
         }
-
-        await base.SaveChangesAsync(cancellationToken);
-        tx.CommitAsync(cancellationToken);
-
-        return result;
     }
 }
