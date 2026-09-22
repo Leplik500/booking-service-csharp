@@ -25,7 +25,11 @@ public class BookingEventPublisher
     {
         _logger.LogInformation(
             "Публикация команды CreateBookingJob: requestId={RequestId}, resourceId={ResourceId}, dates={Start} - {End}",
-            request.RequestId, request.ResourceId, request.StartDate, request.EndDate);
+            request.RequestId,
+            request.ResourceId,
+            request.StartDate,
+            request.EndDate
+        );
 
         await _bus.Publish(request);
 
@@ -39,7 +43,8 @@ public class BookingEventPublisher
     {
         _logger.LogInformation(
             "Публикация команды CancelBookingJob: requestId={RequestId}",
-            request.RequestId);
+            request.RequestId
+        );
 
         await _bus.Publish(request);
 
