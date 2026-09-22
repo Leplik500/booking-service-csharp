@@ -8,6 +8,7 @@ using BookingService.Infrastructure.Messaging.Contracts;
 using BookingService.Infrastructure.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Npgsql;
 
 namespace BookingService.Services;
 
@@ -235,12 +236,12 @@ public class BookingService
             booking.Status
         );
 
+        _repository.TrackProcessedEvent(eventId);
         const int maxTries = 3;
         for (var i = 0; i < maxTries; i++)
             try
             {
                 booking.Confirm();
-                await _repository.SaveEventAsync(eventId);
                 await _repository.SaveAsync(booking);
                 _logger.LogInformation(
                     "Бронирование успешно подтверждено: id={Id}, новый статус={Status}",
@@ -270,6 +271,16 @@ public class BookingService
                 _logger.LogWarning(
                     "Бронирование не подтвеждено: id={Id}, статус=CancellationPending",
                     booking.Id
+                );
+
+                return;
+            }
+            catch (DbUpdateException e)
+                when (e.InnerException is PostgresException { SqlState: "23505" })
+            {
+                _logger.LogWarning(
+                    "Событие BookingJobConfirmed: requestId={RequestId} уже обработано",
+                    requestId
                 );
 
                 return;
@@ -308,6 +319,39 @@ public class BookingService
             return;
         }
 
+        switch (booking.Status)
+        {
+            case BookingStatus.CancellationPending:
+                _logger.LogWarning(
+                    "Бронирование id={Id} в статусе CancellationPending — BookingJobDenied проигнорировано",
+                    booking.Id
+                );
+
+                return;
+            case BookingStatus.Cancelled:
+                _logger.LogWarning(
+                    "Бронирование id={Id} в статусе Cancelled — BookingJobDenied проигнорировано",
+                    booking.Id
+                );
+
+                return;
+            case BookingStatus.None:
+                _logger.LogWarning(
+                    "Бронирование id={Id} в статусе None — BookingJobDenied проигнорировано",
+                    booking.Id
+                );
+
+                return;
+
+            case BookingStatus.AwaitConfirmation:
+            case BookingStatus.Confirmed:
+            {
+                break;
+            }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(booking.Status));
+        }
+
         _logger.LogInformation(
             "Найдено бронирование: id={Id}, статус={Status}. Отменяем...",
             booking.Id,
@@ -316,8 +360,21 @@ public class BookingService
 
         var currentDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow().UtcDateTime);
         booking.Cancel(currentDate);
-        await _repository.SaveEventAsync(eventId);
-        await _repository.SaveAsync(booking);
+        _repository.TrackProcessedEvent(eventId);
+        try
+        {
+            await _repository.SaveAsync(booking);
+        }
+        catch (DbUpdateException e)
+            when (e.InnerException is PostgresException { SqlState: "23505" })
+        {
+            _logger.LogWarning(
+                "Событие BookingJobConfirmed: requestId={RequestId} уже обработано",
+                requestId
+            );
+
+            return;
+        }
 
         _logger.LogInformation(
             "Бронирование успешно отменено: id={Id}, новый статус={Status}",
@@ -376,8 +433,21 @@ public class BookingService
         }
 
         booking.RollbackCancellation();
-        await _repository.SaveEventAsync(eventId);
-        await _repository.SaveAsync(booking);
+        _repository.TrackProcessedEvent(eventId);
+        try
+        {
+            await _repository.SaveAsync(booking);
+        }
+        catch (DbUpdateException e)
+            when (e.InnerException is PostgresException { SqlState: "23505" })
+        {
+            _logger.LogWarning(
+                "Событие BookingJobConfirmed: requestId={RequestId} уже обработано",
+                requestId
+            );
+
+            return;
+        }
 
         _logger.LogInformation(
             "Был произведён откат отмены бронирования: id={Id}, новый статус={Status}",

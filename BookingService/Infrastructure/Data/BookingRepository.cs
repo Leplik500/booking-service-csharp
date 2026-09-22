@@ -75,12 +75,7 @@ public class BookingRepository
         if (booking.Id == 0)
             _context.Bookings.Add(booking);
 
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateException e)
-            when (e.InnerException is PostgresException { SqlState: "23505" }) { }
+        await _context.SaveChangesAsync();
     }
 
     /// <summary>
@@ -148,8 +143,8 @@ public class BookingRepository
         return await _context.ProcessedEvents.AnyAsync(b => b.EventId == eventId);
     }
 
-    public async Task SaveEventAsync(Guid eventId)
+    public void TrackProcessedEvent(Guid eventId)
     {
-        await _context.ProcessedEvents.AddAsync(new ProcessedEvent(eventId, DateTimeOffset.UtcNow));
+        _context.ProcessedEvents.Add(ProcessedEvent.Create(eventId));
     }
 }

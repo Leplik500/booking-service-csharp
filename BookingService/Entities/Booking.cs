@@ -86,7 +86,6 @@ public class Booking
 
     /// <summary>
     /// Отменить бронирование с учётом бизнес-правил.
-    /// TODO: Task 01 — добавить обработку статуса Confirmed (→ CancellationPending)
     /// </summary>
     public void Cancel(DateOnly currentDate)
     {
