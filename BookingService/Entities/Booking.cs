@@ -1,4 +1,3 @@
-using BookingService.Dto.Request;
 using BookingService.Exceptions;
 
 namespace BookingService.Entities;

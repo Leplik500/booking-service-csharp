@@ -1,8 +1,6 @@
-using BookingService.Dto.Request;
 using BookingService.Dto.Response;
 using BookingService.Entities;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace BookingService.Infrastructure.Data;
 

@@ -193,41 +193,15 @@ public class BookingService
             return;
         }
 
-        switch (booking.Status)
+        if (booking.Status != BookingStatus.AwaitConfirmation)
         {
-            case BookingStatus.Confirmed:
-                _logger.LogWarning(
-                    "Бронирование id={Id} в статусе Confirmed — BookingJobConfirmed проигнорировано",
-                    booking.Id
-                );
+            _logger.LogWarning(
+                "Бронирование id={Id} в статусе {Status} — BookingJobConfirmed проигнорировано",
+                booking.Id,
+                booking.Status
+            );
 
-                return;
-            case BookingStatus.CancellationPending:
-                _logger.LogWarning(
-                    "Бронирование id={Id} в статусе CancellationPending — BookingJobConfirmed проигнорировано (race condition)",
-                    booking.Id
-                );
-
-                return;
-            case BookingStatus.Cancelled:
-                _logger.LogWarning(
-                    "Бронирование id={Id} в статусе Cancelled — BookingJobConfirmed проигнорировано",
-                    booking.Id
-                );
-
-                return;
-            case BookingStatus.None:
-                _logger.LogWarning(
-                    "Бронирование id={Id} в статусе None — BookingJobConfirmed проигнорировано",
-                    booking.Id
-                );
-
-                return;
-
-            case BookingStatus.AwaitConfirmation:
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(booking.Status));
+            return;
         }
 
         _logger.LogInformation(
@@ -264,7 +238,7 @@ public class BookingService
                     throw;
                 }
 
-                await e.Entries[0].ReloadAsync();
+                await e.Entries.FirstOrDefault(x => x.Entity is Booking)?.ReloadAsync()!;
                 if (booking.Status == BookingStatus.AwaitConfirmation)
                     continue;
 
@@ -279,8 +253,8 @@ public class BookingService
                 when (e.InnerException is PostgresException { SqlState: "23505" })
             {
                 _logger.LogWarning(
-                    "Событие BookingJobConfirmed: requestId={RequestId} уже обработано",
-                    requestId
+                    "Событие BookingJobConfirmed: eventId={EventId} уже обработано",
+                    eventId
                 );
 
                 return;
@@ -319,37 +293,18 @@ public class BookingService
             return;
         }
 
-        switch (booking.Status)
+        if (
+            booking.Status != BookingStatus.AwaitConfirmation
+            && booking.Status != BookingStatus.Confirmed
+        )
         {
-            case BookingStatus.CancellationPending:
-                _logger.LogWarning(
-                    "Бронирование id={Id} в статусе CancellationPending — BookingJobDenied проигнорировано",
-                    booking.Id
-                );
+            _logger.LogWarning(
+                "Бронирование id={Id} в статусе {Status} — BookingJobDenied проигнорировано",
+                booking.Id,
+                booking.Status
+            );
 
-                return;
-            case BookingStatus.Cancelled:
-                _logger.LogWarning(
-                    "Бронирование id={Id} в статусе Cancelled — BookingJobDenied проигнорировано",
-                    booking.Id
-                );
-
-                return;
-            case BookingStatus.None:
-                _logger.LogWarning(
-                    "Бронирование id={Id} в статусе None — BookingJobDenied проигнорировано",
-                    booking.Id
-                );
-
-                return;
-
-            case BookingStatus.AwaitConfirmation:
-            case BookingStatus.Confirmed:
-            {
-                break;
-            }
-            default:
-                throw new ArgumentOutOfRangeException(nameof(booking.Status));
+            return;
         }
 
         _logger.LogInformation(
@@ -369,8 +324,8 @@ public class BookingService
             when (e.InnerException is PostgresException { SqlState: "23505" })
         {
             _logger.LogWarning(
-                "Событие BookingJobConfirmed: requestId={RequestId} уже обработано",
-                requestId
+                "Событие BookingJobDenied: eventId={EventId} уже обработано",
+                eventId
             );
 
             return;
@@ -442,8 +397,8 @@ public class BookingService
             when (e.InnerException is PostgresException { SqlState: "23505" })
         {
             _logger.LogWarning(
-                "Событие BookingJobConfirmed: requestId={RequestId} уже обработано",
-                requestId
+                "Событие BookingJobDenied: eventId={EventId} уже обработано",
+                eventId
             );
 
             return;
