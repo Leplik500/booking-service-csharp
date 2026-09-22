@@ -1,3 +1,4 @@
+using BookingService.Dto.Request;
 using BookingService.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -14,6 +15,11 @@ public class BookingDbContext : DbContext
     public DbSet<BookingStatusHistory> BookingStatusHistory
     {
         get => Set<BookingStatusHistory>();
+    }
+
+    public DbSet<ProcessedEvent> ProcessedEvents
+    {
+        get => Set<ProcessedEvent>();
     }
 
     public BookingDbContext(DbContextOptions<BookingDbContext> options)
@@ -111,6 +117,22 @@ public class BookingDbContext : DbContext
             entity.Property(b => b.StatusTo).HasColumnName("status_to").IsRequired();
 
             entity.HasIndex(b => b.BookingId, "idx_booking_status_history_booking_id");
+        });
+
+        modelBuilder.Entity<ProcessedEvent>(entity =>
+        {
+            entity.ToTable("processed_events").HasKey(e => e.EventId);
+
+            entity
+                .Property(e => e.EventId)
+                .HasColumnName("event_id")
+                .HasColumnType("uuid")
+                .IsRequired();
+
+            entity
+                .Property(e => e.ProcessedAt)
+                .HasColumnName("processed_at")
+                .HasColumnType("timestamp with time zone");
         });
     }
 

@@ -164,12 +164,22 @@ public class BookingService
     /// Обработать событие подтверждения booking job от Catalog Service.
     /// Переводит бронирование в статус Confirmed.
     /// </summary>
-    public async Task HandleBookingJobConfirmed(Guid requestId)
+    public async Task HandleBookingJobConfirmed(Guid requestId, Guid eventId)
     {
         _logger.LogInformation(
             "Получено событие BookingJobConfirmed: requestId={RequestId}",
             requestId
         );
+
+        if (await _repository.IsEventProcessedAsync(eventId))
+        {
+            _logger.LogWarning(
+                "Событие BookingJobConfirmed: requestId={RequestId} уже обработано",
+                requestId
+            );
+
+            return;
+        }
 
         var booking = await _repository.FindByCatalogRequestIdAsync(requestId);
         if (booking is null)
@@ -230,6 +240,7 @@ public class BookingService
             try
             {
                 booking.Confirm();
+                await _repository.SaveEventAsync(eventId);
                 await _repository.SaveAsync(booking);
                 _logger.LogInformation(
                     "Бронирование успешно подтверждено: id={Id}, новый статус={Status}",
@@ -269,12 +280,22 @@ public class BookingService
     /// Обработать событие отклонения booking job от Catalog Service.
     /// Отменяет бронирование.
     /// </summary>
-    public async Task HandleBookingJobDenied(Guid requestId)
+    public async Task HandleBookingJobDenied(Guid requestId, Guid eventId)
     {
         _logger.LogInformation(
             "Получено событие BookingJobDenied: requestId={RequestId}",
             requestId
         );
+
+        if (await _repository.IsEventProcessedAsync(eventId))
+        {
+            _logger.LogWarning(
+                "Событие BookingJobDenied: requestId={RequestId} уже обработано",
+                requestId
+            );
+
+            return;
+        }
 
         var booking = await _repository.FindByCatalogRequestIdAsync(requestId);
         if (booking is null)
@@ -295,6 +316,7 @@ public class BookingService
 
         var currentDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow().UtcDateTime);
         booking.Cancel(currentDate);
+        await _repository.SaveEventAsync(eventId);
         await _repository.SaveAsync(booking);
 
         _logger.LogInformation(
@@ -308,12 +330,23 @@ public class BookingService
     /// Обработать ошибку при отмене
     /// </summary>
     /// <param name="requestId"></param>
-    public async Task HandleCancellationError(Guid requestId)
+    /// <param name="eventId"></param>
+    public async Task HandleCancellationError(Guid requestId, Guid eventId)
     {
         _logger.LogWarning(
             "Произошла ошибка отмены бронирования: requestId={RequestId}",
             requestId
         );
+
+        if (await _repository.IsEventProcessedAsync(eventId))
+        {
+            _logger.LogWarning(
+                "Событие CancellationError: requestId={RequestId} уже обработано",
+                requestId
+            );
+
+            return;
+        }
 
         var booking = await _repository.FindByCatalogRequestIdAsync(requestId);
         if (booking is null)
@@ -343,6 +376,7 @@ public class BookingService
         }
 
         booking.RollbackCancellation();
+        await _repository.SaveEventAsync(eventId);
         await _repository.SaveAsync(booking);
 
         _logger.LogInformation(
@@ -350,12 +384,6 @@ public class BookingService
             booking.Id,
             booking.Status
         );
-    }
-
-    /// <summary>Устаревший метод-заглушка — используйте HandleCancellationError</summary>
-    public Task HandleError(Guid requestId)
-    {
-        return HandleCancellationError(requestId);
     }
 
     /// <summary>Вернуть историю изменений статусов для указанного бронирования</summary>

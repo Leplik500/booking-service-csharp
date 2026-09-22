@@ -1,6 +1,8 @@
+using BookingService.Dto.Request;
 using BookingService.Dto.Response;
 using BookingService.Entities;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace BookingService.Infrastructure.Data;
 
@@ -73,7 +75,12 @@ public class BookingRepository
         if (booking.Id == 0)
             _context.Bookings.Add(booking);
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException e)
+            when (e.InnerException is PostgresException { SqlState: "23505" }) { }
     }
 
     /// <summary>
@@ -134,5 +141,15 @@ public class BookingRepository
             .Where(bh => bh.BookingId == bookingId)
             .OrderBy(bh => bh.ChangedAt)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsEventProcessedAsync(Guid eventId)
+    {
+        return await _context.ProcessedEvents.AnyAsync(b => b.EventId == eventId);
+    }
+
+    public async Task SaveEventAsync(Guid eventId)
+    {
+        await _context.ProcessedEvents.AddAsync(new ProcessedEvent(eventId, DateTimeOffset.UtcNow));
     }
 }
