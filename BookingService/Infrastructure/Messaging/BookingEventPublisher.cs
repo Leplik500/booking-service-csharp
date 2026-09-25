@@ -54,11 +54,11 @@ public class BookingEventPublisher
     public async Task PublishStatusChanged(BookingStatusChangedEvent bookingStatusChangedEvent)
     {
         _logger.LogInformation(
-            "Публикация события StatusChanged: bookingId={bookingId}, oldStatus={oldStatus}, newStatus={newStatus}, changedAt={changedAt}",
-            bookingStatusChangedEvent.bookingId,
-            bookingStatusChangedEvent.oldStatus,
-            bookingStatusChangedEvent.newStatus,
-            bookingStatusChangedEvent.changedAt
+            "Публикация события StatusChanged: BookingId={BookingId}, OldStatus={OldStatus}, NewStatus={NewStatus}, ChangedAt={ChangedAt}",
+            bookingStatusChangedEvent.BookingId,
+            bookingStatusChangedEvent.OldStatus,
+            bookingStatusChangedEvent.NewStatus,
+            bookingStatusChangedEvent.ChangedAt
         );
 
         await _bus.Publish(bookingStatusChangedEvent);

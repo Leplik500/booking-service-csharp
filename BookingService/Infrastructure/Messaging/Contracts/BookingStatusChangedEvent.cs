@@ -4,35 +4,21 @@ namespace BookingService.Infrastructure.Messaging.Contracts;
 
 public class BookingStatusChangedEvent
 {
-    public long bookingId { get; init; }
-    public BookingStatus oldStatus { get; init; }
-    public BookingStatus newStatus { get; init; }
-    public DateTimeOffset changedAt { get; init; }
+    public long BookingId { get; init; }
+    public BookingStatus OldStatus { get; init; }
+    public BookingStatus NewStatus { get; init; }
+    public DateTimeOffset ChangedAt { get; init; }
 
-    private BookingStatusChangedEvent(
+    public BookingStatusChangedEvent(
         long bookingId,
         BookingStatus oldStatus,
         BookingStatus newStatus,
         DateTimeOffset changedAt
     )
     {
-        this.bookingId = bookingId;
-        this.oldStatus = oldStatus;
-        this.newStatus = newStatus;
-        this.changedAt = changedAt;
-    }
-
-    public static BookingStatusChangedEvent Create(
-        long bookingId,
-        BookingStatus oldStatus,
-        BookingStatus newStatus
-    )
-    {
-        return new BookingStatusChangedEvent(
-            bookingId,
-            oldStatus,
-            newStatus,
-            DateTimeOffset.UtcNow
-        );
+        BookingId = bookingId;
+        OldStatus = oldStatus;
+        NewStatus = newStatus;
+        ChangedAt = changedAt;
     }
 }

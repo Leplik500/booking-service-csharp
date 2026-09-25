@@ -106,10 +106,14 @@ public class BookingService
         await _repository.SaveAsync(booking);
 
         var newStatus = booking.Status;
-        if (newStatus != oldStatus)
-            await _publisher.PublishStatusChanged(
-                BookingStatusChangedEvent.Create(booking.Id, oldStatus, newStatus)
-            );
+        await _publisher.PublishStatusChanged(
+            new BookingStatusChangedEvent(
+                booking.Id,
+                oldStatus,
+                newStatus,
+                _dateTimeProvider.UtcNow()
+            )
+        );
 
         if (booking.CatalogRequestId is not null)
         {
@@ -229,10 +233,14 @@ public class BookingService
                 await _repository.SaveAsync(booking);
 
                 var newStatus = booking.Status;
-                if (newStatus != oldStatus)
-                    await _publisher.PublishStatusChanged(
-                        BookingStatusChangedEvent.Create(booking.Id, oldStatus, newStatus)
-                    );
+                await _publisher.PublishStatusChanged(
+                    new BookingStatusChangedEvent(
+                        booking.Id,
+                        oldStatus,
+                        newStatus,
+                        _dateTimeProvider.UtcNow()
+                    )
+                );
 
                 _logger.LogInformation(
                     "Бронирование успешно подтверждено: id={Id}, новый статус={Status}",
@@ -339,10 +347,14 @@ public class BookingService
         {
             await _repository.SaveAsync(booking);
             var newStatus = booking.Status;
-            if (newStatus != oldStatus)
-                await _publisher.PublishStatusChanged(
-                    BookingStatusChangedEvent.Create(booking.Id, oldStatus, newStatus)
-                );
+            await _publisher.PublishStatusChanged(
+                new BookingStatusChangedEvent(
+                    booking.Id,
+                    oldStatus,
+                    newStatus,
+                    _dateTimeProvider.UtcNow()
+                )
+            );
         }
         catch (DbUpdateException e)
             when (e.InnerException is PostgresException { SqlState: "23505" })
@@ -420,10 +432,14 @@ public class BookingService
             await _repository.SaveAsync(booking);
 
             var newStatus = booking.Status;
-            if (newStatus != oldStatus)
-                await _publisher.PublishStatusChanged(
-                    BookingStatusChangedEvent.Create(booking.Id, oldStatus, newStatus)
-                );
+            await _publisher.PublishStatusChanged(
+                new BookingStatusChangedEvent(
+                    booking.Id,
+                    oldStatus,
+                    newStatus,
+                    _dateTimeProvider.UtcNow()
+                )
+            );
         }
         catch (DbUpdateException e)
             when (e.InnerException is PostgresException { SqlState: "23505" })
