@@ -25,7 +25,11 @@ public class BookingEventPublisher
     {
         _logger.LogInformation(
             "Публикация команды CreateBookingJob: requestId={RequestId}, resourceId={ResourceId}, dates={Start} - {End}",
-            request.RequestId, request.ResourceId, request.StartDate, request.EndDate);
+            request.RequestId,
+            request.ResourceId,
+            request.StartDate,
+            request.EndDate
+        );
 
         await _bus.Publish(request);
 
@@ -39,10 +43,26 @@ public class BookingEventPublisher
     {
         _logger.LogInformation(
             "Публикация команды CancelBookingJob: requestId={RequestId}",
-            request.RequestId);
+            request.RequestId
+        );
 
         await _bus.Publish(request);
 
         _logger.LogInformation("Команда CancelBookingJob отправлена в RabbitMQ");
+    }
+
+    public async Task PublishStatusChanged(BookingStatusChangedEvent bookingStatusChangedEvent)
+    {
+        _logger.LogInformation(
+            "Публикация события StatusChanged: BookingId={BookingId}, OldStatus={OldStatus}, NewStatus={NewStatus}, ChangedAt={ChangedAt}",
+            bookingStatusChangedEvent.BookingId,
+            bookingStatusChangedEvent.OldStatus,
+            bookingStatusChangedEvent.NewStatus,
+            bookingStatusChangedEvent.ChangedAt
+        );
+
+        await _bus.Publish(bookingStatusChangedEvent);
+
+        _logger.LogInformation("Событие StatusChangedEvent отправлено в RabbitMQ");
     }
 }

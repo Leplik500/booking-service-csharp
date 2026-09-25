@@ -17,10 +17,16 @@ public class BookingRepository
     }
 
     public async Task<Booking?> FindByIdAsync(long id)
-        => await _context.Bookings.FindAsync(id);
+    {
+        return await _context.Bookings.FindAsync(id);
+    }
 
     public async Task<Booking?> FindByCatalogRequestIdAsync(Guid catalogRequestId)
-        => await _context.Bookings.FirstOrDefaultAsync(b => b.CatalogRequestId == catalogRequestId);
+    {
+        return await _context.Bookings.FirstOrDefaultAsync(b =>
+            b.CatalogRequestId == catalogRequestId
+        );
+    }
 
     /// <summary>
     /// Найти бронирования по опциональным фильтрам с пагинацией
@@ -30,7 +36,8 @@ public class BookingRepository
         long? resourceId,
         BookingStatus? status,
         int pageNumber,
-        int pageSize)
+        int pageSize
+    )
     {
         var query = _context.Bookings.AsQueryable();
 
@@ -43,21 +50,24 @@ public class BookingRepository
         if (status.HasValue)
             query = query.Where(b => b.Status == status.Value);
 
-        return await query
-            .Skip(pageNumber * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+        return await query.Skip(pageNumber * pageSize).Take(pageSize).ToListAsync();
     }
 
     /// <summary>
     /// Получить только статус бронирования по ID
     /// </summary>
     public async Task<BookingStatus?> FindStatusByIdAsync(long id)
-        => await _context.Bookings
-            .Where(b => b.Id == id)
+    {
+        return await _context
+            .Bookings.Where(b => b.Id == id)
             .Select(b => (BookingStatus?)b.Status)
             .FirstOrDefaultAsync();
+    }
 
+    /// <summary>
+    /// Сохранить изменения в бронировании
+    /// </summary>
+    /// <param name="booking">Бронирование</param>
     public async Task SaveAsync(Booking booking)
     {
         if (booking.Id == 0)
@@ -66,11 +76,73 @@ public class BookingRepository
         await _context.SaveChangesAsync();
     }
 
-    // TODO: Task 02 — реализовать агрегирующий SQL-запрос статистики
-    public Task<StatisticsResponse> GetStatisticsAsync()
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Получить статистику по бронированиям
+    /// </summary>
+    /// <returns>StaticsResponse</returns>
+    public async Task<StatisticsResponse> GetStatisticsAsync()
+    {
+        var bookingsCount = await _context.Bookings.CountAsync();
+        var bookingsGroupedByStatus = await _context
+            .Bookings.GroupBy(b => b.Status)
+            .Select(g => new StatusCount { Count = g.Count(), Status = g.Key })
+            .ToListAsync();
 
-    // TODO: Task 03 — найти бронирования, застрявшие в CancellationPending
-    public Task<List<Booking>> FindStuckCancellationsAsync(DateTimeOffset cancellationRequestedBefore)
-        => throw new NotImplementedException();
+        const int topResourcesLimit = 5;
+
+        var mostPopularResources = await _context
+            .Bookings.GroupBy(b => b.ResourceId)
+            .OrderByDescending(b => b.Count())
+            .Select(g => new ResourceCount { BookingCount = g.Count(), ResourceId = g.Key })
+            .Take(topResourcesLimit)
+            .ToListAsync();
+
+        return new StatisticsResponse
+        {
+            ByStatus = bookingsGroupedByStatus,
+            TopResources = mostPopularResources,
+            TotalCount = bookingsCount,
+        };
+    }
+
+    /// <summary>
+    ///  Найти зависшие отмены
+    /// </summary>
+    /// <param name="cancellationRequestedBefore"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task<List<Booking>> FindStuckCancellationsAsync(
+        DateTimeOffset cancellationRequestedBefore,
+        CancellationToken cancellationToken
+    )
+    {
+        return await _context
+            .Bookings.Where(b =>
+                b.Status == BookingStatus.CancellationPending
+                && b.CancellationRequestedAt < cancellationRequestedBefore
+            )
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<BookingStatusHistory>> GetBookingHistoryAsync(
+        long bookingId,
+        CancellationToken cancellationToken
+    )
+    {
+        return await _context
+            .BookingStatusHistory.AsNoTracking()
+            .Where(bh => bh.BookingId == bookingId)
+            .OrderBy(bh => bh.ChangedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsEventProcessedAsync(Guid eventId)
+    {
+        return await _context.ProcessedEvents.AnyAsync(b => b.EventId == eventId);
+    }
+
+    public void TrackProcessedEvent(Guid eventId)
+    {
+        _context.ProcessedEvents.Add(ProcessedEvent.Create(eventId));
+    }
 }
