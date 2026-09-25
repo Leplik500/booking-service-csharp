@@ -99,9 +99,17 @@ public class BookingService
             ?? throw new BusinessException($"Бронирование с указанным id: '{id}' не найдено.");
 
         var currentDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow().UtcDateTime);
+
+        var oldStatus = booking.Status;
         booking.Cancel(currentDate);
 
         await _repository.SaveAsync(booking);
+
+        var newStatus = booking.Status;
+        if (newStatus != oldStatus)
+            await _publisher.PublishStatusChanged(
+                BookingStatusChangedEvent.Create(booking.Id, oldStatus, newStatus)
+            );
 
         if (booking.CatalogRequestId is not null)
         {
@@ -215,8 +223,17 @@ public class BookingService
         for (var i = 0; i < maxTries; i++)
             try
             {
+                var oldStatus = booking.Status;
                 booking.Confirm();
+
                 await _repository.SaveAsync(booking);
+
+                var newStatus = booking.Status;
+                if (newStatus != oldStatus)
+                    await _publisher.PublishStatusChanged(
+                        BookingStatusChangedEvent.Create(booking.Id, oldStatus, newStatus)
+                    );
+
                 _logger.LogInformation(
                     "Бронирование успешно подтверждено: id={Id}, новый статус={Status}",
                     booking.Id,
@@ -314,11 +331,18 @@ public class BookingService
         );
 
         var currentDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow().UtcDateTime);
+        var oldStatus = booking.Status;
+
         booking.Cancel(currentDate);
         _repository.TrackProcessedEvent(eventId);
         try
         {
             await _repository.SaveAsync(booking);
+            var newStatus = booking.Status;
+            if (newStatus != oldStatus)
+                await _publisher.PublishStatusChanged(
+                    BookingStatusChangedEvent.Create(booking.Id, oldStatus, newStatus)
+                );
         }
         catch (DbUpdateException e)
             when (e.InnerException is PostgresException { SqlState: "23505" })
@@ -387,11 +411,19 @@ public class BookingService
             return;
         }
 
+        var oldStatus = booking.Status;
         booking.RollbackCancellation();
+
         _repository.TrackProcessedEvent(eventId);
         try
         {
             await _repository.SaveAsync(booking);
+
+            var newStatus = booking.Status;
+            if (newStatus != oldStatus)
+                await _publisher.PublishStatusChanged(
+                    BookingStatusChangedEvent.Create(booking.Id, oldStatus, newStatus)
+                );
         }
         catch (DbUpdateException e)
             when (e.InnerException is PostgresException { SqlState: "23505" })

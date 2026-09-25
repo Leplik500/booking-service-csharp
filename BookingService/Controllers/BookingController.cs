@@ -2,7 +2,6 @@ using BookingService.Dto.Request;
 using BookingService.Dto.Response;
 using BookingService.Entities;
 using BookingService.Mappers;
-using BookingService.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BookingService.Controllers;

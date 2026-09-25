@@ -50,4 +50,19 @@ public class BookingEventPublisher
 
         _logger.LogInformation("Команда CancelBookingJob отправлена в RabbitMQ");
     }
+
+    public async Task PublishStatusChanged(BookingStatusChangedEvent bookingStatusChangedEvent)
+    {
+        _logger.LogInformation(
+            "Публикация события StatusChanged: bookingId={bookingId}, oldStatus={oldStatus}, newStatus={newStatus}, changedAt={changedAt}",
+            bookingStatusChangedEvent.bookingId,
+            bookingStatusChangedEvent.oldStatus,
+            bookingStatusChangedEvent.newStatus,
+            bookingStatusChangedEvent.changedAt
+        );
+
+        await _bus.Publish(bookingStatusChangedEvent);
+
+        _logger.LogInformation("Событие StatusChangedEvent отправлено в RabbitMQ");
+    }
 }
