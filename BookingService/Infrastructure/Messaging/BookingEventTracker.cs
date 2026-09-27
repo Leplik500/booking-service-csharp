@@ -1,11 +1,11 @@
+using BookingService.Entities;
 using BookingService.Infrastructure.Data;
 using BookingService.Infrastructure.Messaging.Contracts;
 
 namespace BookingService.Infrastructure.Messaging;
 
 /// <summary>
-/// Сервис для публикации сообщений в RabbitMQ через Rebus.
-/// Rebus автоматически устанавливает заголовки и маршрутизирует сообщения.
+/// Сервис для отслеживания сообщений
 /// </summary>
 public class BookingEventTracker
 {
@@ -22,7 +22,7 @@ public class BookingEventTracker
     }
 
     /// <summary>
-    /// Публикует команду создания booking job в Catalog Service
+    /// Отслеживает команду создания booking job в Catalog Service
     /// </summary>
     public async Task TrackCreateBookingJob(CreateBookingJobRequest request)
     {
@@ -40,7 +40,7 @@ public class BookingEventTracker
     }
 
     /// <summary>
-    /// Публикует команду отмены booking job в Catalog Service
+    /// Отслеживает команду отмены booking job в Catalog Service
     /// </summary>
     public async Task TrackCancelBookingJob(CancelBookingJobByRequestIdRequest request)
     {
@@ -54,6 +54,10 @@ public class BookingEventTracker
         _logger.LogInformation("Команда CancelBookingJob отправлена в RabbitMQ");
     }
 
+    /// <summary>
+    /// Отслеживает событие StatusChanged
+    /// </summary>
+    /// <param name="bookingStatusChangedEvent"></param>
     public async Task TrackStatusChanged(BookingStatusChangedEvent bookingStatusChangedEvent)
     {
         _logger.LogInformation(
@@ -66,6 +70,6 @@ public class BookingEventTracker
 
         await _bookingRepository.TrackOutboxMessageAsync(bookingStatusChangedEvent);
 
-        _logger.LogInformation("Событие StatusChangedEvent отправлено в RabbitMQ");
+        _logger.LogInformation("Событие StatusChangedEvent добавлено в outbox");
     }
 }

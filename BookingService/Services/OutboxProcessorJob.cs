@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BookingService.Configuration;
 using BookingService.Infrastructure.Data;
 using Rebus.Bus;
@@ -7,14 +8,11 @@ namespace BookingService.Services;
 public class OutboxProcessorJob : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<StuckCancellationsJob> _logger;
+    private readonly ILogger<OutboxProcessorJob> _logger;
     private readonly TimeSpan _interval = TimeSpan.FromMinutes(1);
     private const int _maxTries = 3;
 
-    public OutboxProcessorJob(
-        IServiceScopeFactory scopeFactory,
-        ILogger<StuckCancellationsJob> logger
-    )
+    public OutboxProcessorJob(IServiceScopeFactory scopeFactory, ILogger<OutboxProcessorJob> logger)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
@@ -37,34 +35,45 @@ public class OutboxProcessorJob : BackgroundService
 
                 var bus = scope.ServiceProvider.GetRequiredService<IBus>();
 
-                var unprocessedMessages = await bookingRepository.GetUnprocessedMessagesAsync();
+                var batches = bookingRepository.GetUnprocessedMessagesAsync(stoppingToken);
 
-                foreach (var message in unprocessedMessages)
+                await foreach (var batch in batches)
                 {
-                    try
+                    foreach (var message in batch)
                     {
-                        stoppingToken.ThrowIfCancellationRequested();
+                        try
+                        {
+                            stoppingToken.ThrowIfCancellationRequested();
 
-                        await bus.Send(message);
-                        message.ProcessedAt = dateTimeProvider.UtcNow();
+                            var messageType = Type.GetType(message.MessageType);
+                            message.Payload.Deserialize(
+                                messageType ?? throw new InvalidOperationException()
+                            );
 
-                        _logger.LogInformation(
-                            "Сообщение {Id} было отправлено в RabbitMQ",
-                            message.Id
-                        );
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        _logger.LogInformation("Отправка сообщения {Id} была отменена", message.Id);
+                            await bus.Send(message);
+                            message.ProcessedAt = dateTimeProvider.UtcNow();
 
-                        return;
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.LogWarning(e, "Сообщение не отправлено: {Message}", e.Message);
-                        message.RetryCount++;
-                        if (message.RetryCount >= _maxTries)
-                            message.FailedAt = dateTimeProvider.UtcNow();
+                            _logger.LogInformation(
+                                "Сообщение {Id} было отправлено в RabbitMQ",
+                                message.Id
+                            );
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            _logger.LogInformation(
+                                "Отправка сообщения {Id} была отменена",
+                                message.Id
+                            );
+
+                            return;
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.LogWarning(e, "Сообщение не отправлено: {Message}", e.Message);
+                            message.RetryCount++;
+                            if (message.RetryCount >= _maxTries)
+                                message.FailedAt = dateTimeProvider.UtcNow();
+                        }
                     }
                 }
             }

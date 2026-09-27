@@ -66,6 +66,8 @@ public class StuckCancellationsJob : BackgroundService
                             }
                         );
 
+                        await bookingRepository.SaveAsync(booking);
+
                         _logger.LogInformation(
                             "Бронирование {requestId} было отменено заново",
                             booking.CatalogRequestId

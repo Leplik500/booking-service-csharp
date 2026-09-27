@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using BookingService.Dto.Response;
 using BookingService.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -110,7 +111,7 @@ public class BookingRepository
     /// </summary>
     public async Task<List<Booking>> FindStuckCancellationsAsync(
         DateTimeOffset cancellationRequestedBefore,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken = default
     )
     {
         return await _context
@@ -123,7 +124,7 @@ public class BookingRepository
 
     public async Task<List<BookingStatusHistory>> GetBookingHistoryAsync(
         long bookingId,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken = default
     )
     {
         return await _context
@@ -145,14 +146,20 @@ public class BookingRepository
 
     public async Task TrackOutboxMessageAsync<T>(T message)
     {
-        await _context.OutboxMessages.AddAsync(OutboxMessage.Create(message));
+        var outboxMessage = OutboxMessage.Create(message);
+        await _context.OutboxMessages.AddAsync(outboxMessage);
     }
 
-    public async Task<List<OutboxMessage>> GetUnprocessedMessagesAsync()
+    public async IAsyncEnumerable<List<OutboxMessage>> GetUnprocessedMessagesAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default
+    )
     {
-        return await _context
-            .OutboxMessages.AsNoTracking()
-            .Where(message => message.ProcessedAt == null && message.FailedAt == null)
-            .ToListAsync();
+        yield return await _context
+            .OutboxMessages.Where(message =>
+                message.ProcessedAt == null && message.FailedAt == null
+            )
+            .OrderBy(message => message.Id)
+            .Take(100)
+            .ToListAsync(cancellationToken);
     }
 }

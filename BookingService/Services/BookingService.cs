@@ -111,8 +111,6 @@ public class BookingService
             )
         );
 
-        await _repository.SaveAsync(booking);
-
         if (booking.CatalogRequestId is not null)
         {
             var command = new CancelBookingJobByRequestIdRequest
@@ -123,6 +121,8 @@ public class BookingService
 
             await _tracker.TrackCancelBookingJob(command);
         }
+
+        await _repository.SaveAsync(booking);
 
         _logger.LogInformation(
             "Инициирована отмена бронирования с ID: {Id}, новый статус: {Status}",
@@ -221,22 +221,21 @@ public class BookingService
         );
 
         await _repository.TrackProcessedEventAsync(eventId);
+        var oldStatus = booking.Status;
+        await _tracker.TrackStatusChanged(
+            new BookingStatusChangedEvent(
+                booking.Id,
+                oldStatus,
+                BookingStatus.Confirmed,
+                _dateTimeProvider.UtcNow()
+            )
+        );
+
         const int maxTries = 3;
         for (var i = 0; i < maxTries; i++)
             try
             {
-                var oldStatus = booking.Status;
                 booking.Confirm();
-                var newStatus = booking.Status;
-
-                await _tracker.TrackStatusChanged(
-                    new BookingStatusChangedEvent(
-                        booking.Id,
-                        oldStatus,
-                        newStatus,
-                        _dateTimeProvider.UtcNow()
-                    )
-                );
 
                 await _repository.SaveAsync(booking);
 
@@ -262,6 +261,7 @@ public class BookingService
                 }
 
                 await e.Entries.FirstOrDefault(x => x.Entity is Booking)?.ReloadAsync()!;
+
                 if (booking.Status == BookingStatus.AwaitConfirmation)
                     continue;
 
