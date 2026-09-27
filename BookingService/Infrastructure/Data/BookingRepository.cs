@@ -108,9 +108,6 @@ public class BookingRepository
     /// <summary>
     ///  Найти зависшие отмены
     /// </summary>
-    /// <param name="cancellationRequestedBefore"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
     public async Task<List<Booking>> FindStuckCancellationsAsync(
         DateTimeOffset cancellationRequestedBefore,
         CancellationToken cancellationToken
@@ -141,8 +138,21 @@ public class BookingRepository
         return await _context.ProcessedEvents.AnyAsync(b => b.EventId == eventId);
     }
 
-    public void TrackProcessedEvent(Guid eventId)
+    public async Task TrackProcessedEventAsync(Guid eventId)
     {
-        _context.ProcessedEvents.Add(ProcessedEvent.Create(eventId));
+        await _context.ProcessedEvents.AddAsync(ProcessedEvent.Create(eventId));
+    }
+
+    public async Task TrackOutboxMessageAsync<T>(T message)
+    {
+        await _context.OutboxMessages.AddAsync(OutboxMessage.Create(message));
+    }
+
+    public async Task<List<OutboxMessage>> GetUnprocessedMessagesAsync()
+    {
+        return await _context
+            .OutboxMessages.AsNoTracking()
+            .Where(message => message.ProcessedAt == null && message.FailedAt == null)
+            .ToListAsync();
     }
 }

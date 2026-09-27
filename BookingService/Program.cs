@@ -46,10 +46,11 @@ builder.Services.AddScoped<BookingService.Services.BookingService>();
 builder.Services.AddScoped<BookingMapper>();
 builder.Services.AddSingleton<ICurrentDateTimeProvider, CurrentDateTimeProvider>();
 builder.Services.AddHostedService<StuckCancellationsJob>();
+builder.Services.AddHostedService<OutboxProcessorJob>();
 
 // ---- Messaging (Rebus + RabbitMQ) ----
 builder.Services.AddSingleton(rabbitMqSettings);
-builder.Services.AddScoped<BookingEventPublisher>();
+builder.Services.AddScoped<BookingEventTracker>();
 builder.Services.AddRebus(
     configure =>
         configure

@@ -19,7 +19,7 @@ namespace BookingService.Services;
 public class BookingService
 {
     private readonly BookingRepository _repository;
-    private readonly BookingEventPublisher _publisher;
+    private readonly BookingEventTracker _tracker;
     private readonly ICurrentDateTimeProvider _dateTimeProvider;
     private readonly ILogger<BookingService> _logger;
 
@@ -31,7 +31,7 @@ public class BookingService
 
     public BookingService(
         BookingRepository repository,
-        BookingEventPublisher publisher,
+        BookingEventTracker tracker,
         ICurrentDateTimeProvider dateTimeProvider,
         ILogger<BookingService> logger,
         INotificationService? notificationService = null,
@@ -39,7 +39,7 @@ public class BookingService
     )
     {
         _repository = repository;
-        _publisher = publisher;
+        _tracker = tracker;
         _dateTimeProvider = dateTimeProvider;
         _logger = logger;
         _notificationService = notificationService;
@@ -65,9 +65,6 @@ public class BookingService
 
         var requestId = Guid.NewGuid();
         booking.SetCatalogRequestId(requestId);
-
-        await _repository.SaveAsync(booking);
-
         var command = new CreateBookingJobRequest
         {
             EventId = Guid.NewGuid(),
@@ -77,7 +74,8 @@ public class BookingService
             EndDate = booking.BookedTo,
         };
 
-        await _publisher.PublishCreateBookingJob(command);
+        await _tracker.TrackCreateBookingJob(command);
+        await _repository.SaveAsync(booking);
 
         _logger.LogInformation(
             "Создано бронирование с ID: {Id}, requestId: {RequestId}",
@@ -102,11 +100,9 @@ public class BookingService
 
         var oldStatus = booking.Status;
         booking.Cancel(currentDate);
-
-        await _repository.SaveAsync(booking);
-
         var newStatus = booking.Status;
-        await _publisher.PublishStatusChanged(
+
+        await _tracker.TrackStatusChanged(
             new BookingStatusChangedEvent(
                 booking.Id,
                 oldStatus,
@@ -114,6 +110,8 @@ public class BookingService
                 _dateTimeProvider.UtcNow()
             )
         );
+
+        await _repository.SaveAsync(booking);
 
         if (booking.CatalogRequestId is not null)
         {
@@ -123,7 +121,7 @@ public class BookingService
                 RequestId = booking.CatalogRequestId.Value,
             };
 
-            await _publisher.PublishCancelBookingJob(command);
+            await _tracker.TrackCancelBookingJob(command);
         }
 
         _logger.LogInformation(
@@ -222,18 +220,16 @@ public class BookingService
             booking.Status
         );
 
-        _repository.TrackProcessedEvent(eventId);
+        await _repository.TrackProcessedEventAsync(eventId);
         const int maxTries = 3;
         for (var i = 0; i < maxTries; i++)
             try
             {
                 var oldStatus = booking.Status;
                 booking.Confirm();
-
-                await _repository.SaveAsync(booking);
-
                 var newStatus = booking.Status;
-                await _publisher.PublishStatusChanged(
+
+                await _tracker.TrackStatusChanged(
                     new BookingStatusChangedEvent(
                         booking.Id,
                         oldStatus,
@@ -241,6 +237,8 @@ public class BookingService
                         _dateTimeProvider.UtcNow()
                     )
                 );
+
+                await _repository.SaveAsync(booking);
 
                 _logger.LogInformation(
                     "Бронирование успешно подтверждено: id={Id}, новый статус={Status}",
@@ -339,15 +337,16 @@ public class BookingService
         );
 
         var currentDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow().UtcDateTime);
-        var oldStatus = booking.Status;
 
+        var oldStatus = booking.Status;
         booking.Cancel(currentDate);
-        _repository.TrackProcessedEvent(eventId);
+        var newStatus = booking.Status;
+
         try
         {
-            await _repository.SaveAsync(booking);
-            var newStatus = booking.Status;
-            await _publisher.PublishStatusChanged(
+            await _repository.TrackProcessedEventAsync(eventId);
+
+            await _tracker.TrackStatusChanged(
                 new BookingStatusChangedEvent(
                     booking.Id,
                     oldStatus,
@@ -355,6 +354,8 @@ public class BookingService
                     _dateTimeProvider.UtcNow()
                 )
             );
+
+            await _repository.SaveAsync(booking);
         }
         catch (DbUpdateException e)
             when (e.InnerException is PostgresException { SqlState: "23505" })
@@ -425,14 +426,13 @@ public class BookingService
 
         var oldStatus = booking.Status;
         booking.RollbackCancellation();
+        var newStatus = booking.Status;
 
-        _repository.TrackProcessedEvent(eventId);
         try
         {
-            await _repository.SaveAsync(booking);
+            await _repository.TrackProcessedEventAsync(eventId);
 
-            var newStatus = booking.Status;
-            await _publisher.PublishStatusChanged(
+            await _tracker.TrackStatusChanged(
                 new BookingStatusChangedEvent(
                     booking.Id,
                     oldStatus,
@@ -440,6 +440,8 @@ public class BookingService
                     _dateTimeProvider.UtcNow()
                 )
             );
+
+            await _repository.SaveAsync(booking);
         }
         catch (DbUpdateException e)
             when (e.InnerException is PostgresException { SqlState: "23505" })

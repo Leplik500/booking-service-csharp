@@ -21,6 +21,11 @@ public class BookingDbContext : DbContext
         get => Set<ProcessedEvent>();
     }
 
+    public DbSet<OutboxMessage> OutboxMessages
+    {
+        get => Set<OutboxMessage>();
+    }
+
     public BookingDbContext(DbContextOptions<BookingDbContext> options)
         : base(options) { }
 
@@ -133,6 +138,48 @@ public class BookingDbContext : DbContext
                 .HasColumnName("processed_at")
                 .HasColumnType("timestamp with time zone");
         });
+
+        modelBuilder.Entity<OutboxMessage>(entity =>
+        {
+            entity.ToTable("outbox_messages").HasKey(m => m.Id);
+
+            entity
+                .Property(m => m.Id)
+                .HasColumnName("id")
+                .UseIdentityByDefaultColumn()
+                .HasColumnType("bigint");
+
+            entity
+                .Property(m => m.MessageType)
+                .HasColumnName("message_type")
+                .IsRequired()
+                .HasColumnType("text");
+
+            entity
+                .Property(m => m.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone");
+
+            entity.Property(m => m.Payload).HasColumnName("payload").HasColumnType("jsonb");
+
+            entity
+                .Property(m => m.ProcessedAt)
+                .HasColumnName("processed_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired(false);
+
+            entity.Property(m => m.RetryCount).HasColumnName("retry_count");
+
+            entity
+                .Property(m => m.FailedAt)
+                .HasColumnName("failed_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired(false);
+
+            entity
+                .HasIndex(m => m.ProcessedAt, "idx_outbox_messages_processed_at")
+                .HasFilter("processed_at IS NULL and failed_at IS NULL");
+        });
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -169,7 +216,7 @@ public class BookingDbContext : DbContext
 
         async Task<int> SaveCoreAsync()
         {
-            var result = await base.SaveChangesAsync(cancellationToken);
+            var results = await base.SaveChangesAsync(cancellationToken);
 
             var histories = (
                 from entry in modifiedEntries
@@ -188,12 +235,12 @@ public class BookingDbContext : DbContext
             );
 
             if (histories.Count <= 0)
-                return result;
+                return results;
 
             Set<BookingStatusHistory>().AddRange(histories);
             await base.SaveChangesAsync(cancellationToken);
 
-            return result;
+            return results;
         }
     }
 }

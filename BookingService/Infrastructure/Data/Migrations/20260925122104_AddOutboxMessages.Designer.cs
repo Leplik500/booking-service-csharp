@@ -4,6 +4,7 @@ using System.Text.Json;
 using BookingService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    partial class BookingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260925122104_AddOutboxMessages")]
+    partial class AddOutboxMessages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -130,10 +133,6 @@ namespace BookingService.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTimeOffset?>("FailedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("failed_at");
-
                     b.Property<string>("MessageType")
                         .IsRequired()
                         .HasColumnType("text")
@@ -148,14 +147,10 @@ namespace BookingService.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("processed_at");
 
-                    b.Property<int>("RetryCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("retry_count");
-
                     b.HasKey("Id");
 
                     b.HasIndex(new[] { "ProcessedAt" }, "idx_outbox_messages_processed_at")
-                        .HasFilter("processed_at IS NULL and failed_at IS NULL");
+                        .HasFilter("processed_at IS NULL");
 
                     b.ToTable("outbox_messages", (string)null);
                 });

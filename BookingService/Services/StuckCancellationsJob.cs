@@ -36,7 +36,7 @@ public class StuckCancellationsJob : BackgroundService
                 var dateTimeProvider =
                     scope.ServiceProvider.GetRequiredService<ICurrentDateTimeProvider>();
 
-                var publisher = scope.ServiceProvider.GetRequiredService<BookingEventPublisher>();
+                var publisher = scope.ServiceProvider.GetRequiredService<BookingEventTracker>();
 
                 var cancellingBookings = await bookingRepository.FindStuckCancellationsAsync(
                     dateTimeProvider.UtcNow() - _stuckTimeout,
@@ -58,7 +58,7 @@ public class StuckCancellationsJob : BackgroundService
                             continue;
 
                         stoppingToken.ThrowIfCancellationRequested();
-                        await publisher.PublishCancelBookingJob(
+                        await publisher.TrackCancelBookingJob(
                             new CancelBookingJobByRequestIdRequest
                             {
                                 EventId = Guid.NewGuid(),
