@@ -9,7 +9,7 @@ public class OutboxProcessorJob : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<OutboxProcessorJob> _logger;
-    private readonly TimeSpan _interval = TimeSpan.FromMinutes(1);
+    private readonly TimeSpan _interval = TimeSpan.FromSeconds(3);
     private const int _maxTries = 3;
 
     public OutboxProcessorJob(IServiceScopeFactory scopeFactory, ILogger<OutboxProcessorJob> logger)
@@ -46,11 +46,11 @@ public class OutboxProcessorJob : BackgroundService
                             stoppingToken.ThrowIfCancellationRequested();
 
                             var messageType = Type.GetType(message.MessageType);
-                            message.Payload.Deserialize(
+                            var payload = message.Payload.Deserialize(
                                 messageType ?? throw new InvalidOperationException()
                             );
 
-                            await bus.Send(message);
+                            await bus.Send(payload);
                             message.ProcessedAt = dateTimeProvider.UtcNow();
 
                             _logger.LogInformation(
@@ -69,10 +69,33 @@ public class OutboxProcessorJob : BackgroundService
                         }
                         catch (Exception e)
                         {
-                            _logger.LogWarning(e, "Сообщение не отправлено: {Message}", e.Message);
-                            message.RetryCount++;
                             if (message.RetryCount >= _maxTries)
+                            {
                                 message.FailedAt = dateTimeProvider.UtcNow();
+                                _logger.LogError(
+                                    e,
+                                    "Сообщение {Id} не отправлено: {Message}. Было совершено {RetryCount} попытки",
+                                    message.Id,
+                                    e.Message,
+                                    message.RetryCount
+                                );
+                            }
+                            else
+                            {
+                                _logger.LogWarning(
+                                    e,
+                                    "Сообщение {Id} не отправлено: {Message}. Было совершено {RetryCount} попытки",
+                                    message.Id,
+                                    e.Message,
+                                    message.RetryCount
+                                );
+
+                                message.RetryCount++;
+                            }
+                        }
+                        finally
+                        {
+                            await bookingRepository.SaveAsync();
                         }
                     }
                 }

@@ -78,6 +78,14 @@ public class BookingRepository
     }
 
     /// <summary>
+    /// Сохранить изменения
+    /// </summary>
+    public async Task SaveAsync()
+    {
+        await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
     /// Получить статистику по бронированиям
     /// </summary>
     /// <returns>StaticsResponse</returns>

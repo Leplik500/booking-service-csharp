@@ -36,7 +36,7 @@ public class BookingEventTracker
 
         await _bookingRepository.TrackOutboxMessageAsync(request);
 
-        _logger.LogInformation("Команда CreateBookingJob отправлена в RabbitMQ");
+        _logger.LogInformation("Команда CreateBookingJob добавлена в outbox");
     }
 
     /// <summary>
@@ -51,7 +51,7 @@ public class BookingEventTracker
 
         await _bookingRepository.TrackOutboxMessageAsync(request);
 
-        _logger.LogInformation("Команда CancelBookingJob отправлена в RabbitMQ");
+        _logger.LogInformation("Команда CancelBookingJob добавлена в outbox");
     }
 
     /// <summary>
