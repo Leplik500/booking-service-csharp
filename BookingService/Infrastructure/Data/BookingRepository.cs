@@ -158,16 +158,15 @@ public class BookingRepository
         await _context.OutboxMessages.AddAsync(outboxMessage);
     }
 
-    public async IAsyncEnumerable<List<OutboxMessage>> GetUnprocessedMessagesAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default
+    public async Task<List<OutboxMessage>> GetUnprocessedMessagesAsync(
+        CancellationToken cancellationToken = default
     )
     {
-        yield return await _context
+        return await _context
             .OutboxMessages.Where(message =>
                 message.ProcessedAt == null && message.FailedAt == null
             )
             .OrderBy(message => message.Id)
-            .Take(100)
             .ToListAsync(cancellationToken);
     }
 }

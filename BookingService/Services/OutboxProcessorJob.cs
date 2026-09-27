@@ -35,68 +35,71 @@ public class OutboxProcessorJob : BackgroundService
 
                 var bus = scope.ServiceProvider.GetRequiredService<IBus>();
 
-                var batches = bookingRepository.GetUnprocessedMessagesAsync(stoppingToken);
-
-                await foreach (var batch in batches)
+                var messages = await bookingRepository.GetUnprocessedMessagesAsync(stoppingToken);
+                foreach (var message in messages)
                 {
-                    foreach (var message in batch)
+                    try
                     {
-                        try
-                        {
-                            stoppingToken.ThrowIfCancellationRequested();
+                        stoppingToken.ThrowIfCancellationRequested();
 
-                            var messageType = Type.GetType(message.MessageType);
-                            var payload = message.Payload.Deserialize(
-                                messageType ?? throw new InvalidOperationException()
+                        var messageType = Type.GetType(message.MessageType);
+                        if (messageType != null)
+                        {
+                            var payload = message.Payload.Deserialize(messageType);
+
+                            await bus.Publish(payload);
+                        }
+                        else
+                        {
+                            message.FailedAt = dateTimeProvider.UtcNow();
+                            _logger.LogWarning(
+                                "Не удалось найти тип {MessageType}",
+                                message.MessageType
+                            );
+                        }
+
+                        message.ProcessedAt = dateTimeProvider.UtcNow();
+
+                        _logger.LogInformation(
+                            "Сообщение {Id} было отправлено в RabbitMQ",
+                            message.Id
+                        );
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger.LogInformation("Отправка сообщения {Id} была отменена", message.Id);
+
+                        return;
+                    }
+                    catch (Exception e)
+                    {
+                        if (message.RetryCount >= _maxTries)
+                        {
+                            message.FailedAt = dateTimeProvider.UtcNow();
+                            _logger.LogError(
+                                e,
+                                "Сообщение {Id} не отправлено: {Message}. Было совершено {RetryCount} попытки",
+                                message.Id,
+                                e.Message,
+                                message.RetryCount
+                            );
+                        }
+                        else
+                        {
+                            _logger.LogWarning(
+                                e,
+                                "Сообщение {Id} не отправлено: {Message}. Было совершено {RetryCount} попытки",
+                                message.Id,
+                                e.Message,
+                                message.RetryCount
                             );
 
-                            await bus.Send(payload);
-                            message.ProcessedAt = dateTimeProvider.UtcNow();
-
-                            _logger.LogInformation(
-                                "Сообщение {Id} было отправлено в RabbitMQ",
-                                message.Id
-                            );
+                            message.RetryCount++;
                         }
-                        catch (OperationCanceledException)
-                        {
-                            _logger.LogInformation(
-                                "Отправка сообщения {Id} была отменена",
-                                message.Id
-                            );
-
-                            return;
-                        }
-                        catch (Exception e)
-                        {
-                            if (message.RetryCount >= _maxTries)
-                            {
-                                message.FailedAt = dateTimeProvider.UtcNow();
-                                _logger.LogError(
-                                    e,
-                                    "Сообщение {Id} не отправлено: {Message}. Было совершено {RetryCount} попытки",
-                                    message.Id,
-                                    e.Message,
-                                    message.RetryCount
-                                );
-                            }
-                            else
-                            {
-                                _logger.LogWarning(
-                                    e,
-                                    "Сообщение {Id} не отправлено: {Message}. Было совершено {RetryCount} попытки",
-                                    message.Id,
-                                    e.Message,
-                                    message.RetryCount
-                                );
-
-                                message.RetryCount++;
-                            }
-                        }
-                        finally
-                        {
-                            await bookingRepository.SaveAsync();
-                        }
+                    }
+                    finally
+                    {
+                        await bookingRepository.SaveAsync();
                     }
                 }
             }

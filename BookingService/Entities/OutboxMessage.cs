@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 
 namespace BookingService.Entities;
@@ -17,22 +18,22 @@ public class OutboxMessage
     /// <summary>
     /// ID сообщения
     /// </summary>
-    public long Id { get; set; }
+    public long Id { get; init; }
 
     /// <summary>
     /// Тип сообщения
     /// </summary>
-    public required string MessageType { get; set; }
+    public required string MessageType { get; init; }
 
     /// <summary>
     /// Сериализованное сообщение
     /// </summary>
-    public JsonDocument Payload { get; set; }
+    public required JsonDocument Payload { get; init; }
 
     /// <summary>
     /// Время создания
     /// </summary>
-    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; init; }
 
     /// <summary>
     /// Время успешной публикации

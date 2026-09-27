@@ -45,7 +45,7 @@ public class BookingEventTracker
     public async Task TrackCancelBookingJob(CancelBookingJobByRequestIdRequest request)
     {
         _logger.LogInformation(
-            "Публикация команды CancelBookingJob: requestId={RequestId}",
+            "Добавление команды CancelBookingJob в outbox: requestId={RequestId}",
             request.RequestId
         );
 
