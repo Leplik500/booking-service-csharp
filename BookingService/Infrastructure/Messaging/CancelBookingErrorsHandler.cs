@@ -12,15 +12,23 @@ public class CancelBookingErrorsHandler : IHandleMessages<CancelBookingJobByRequ
     private readonly Services.BookingService _bookingService;
     private readonly ILogger<CancelBookingErrorsHandler> _logger;
 
-    public CancelBookingErrorsHandler(Services.BookingService bookingService, ILogger<CancelBookingErrorsHandler> logger)
+    public CancelBookingErrorsHandler(
+        Services.BookingService bookingService,
+        ILogger<CancelBookingErrorsHandler> logger
+    )
     {
         _bookingService = bookingService;
         _logger = logger;
     }
 
-    // TODO: Task 01 — реализовать компенсирующую транзакцию (откат отмены бронирования)
-    public Task Handle(CancelBookingJobByRequestIdRequest message)
+    public async Task Handle(CancelBookingJobByRequestIdRequest message)
     {
-        throw new NotImplementedException();
+        _logger.LogWarning(
+            "Получена ошибка из DLQ: eventId={EventId}, requestId={RequestId}",
+            message.EventId,
+            message.RequestId
+        );
+
+        await _bookingService.HandleCancellationError(message.RequestId, message.EventId);
     }
 }
