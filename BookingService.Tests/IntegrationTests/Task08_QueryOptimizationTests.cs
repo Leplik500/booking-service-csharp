@@ -31,11 +31,9 @@ public class Task08_QueryOptimizationTests : IntegrationTestBase
         var indexExists = await Context
             .Database.SqlQueryRaw<int>(
                 "SELECT COUNT(*)::int FROM pg_indexes "
-                    + "WHERE tablename = 'bookings'"
+                    + "WHERE tablename = 'bookings' "
                     + "AND indexdef LIKE '%resource_id%booked_from%booked_to%'"
                     + "AND indexname = 'idx_bookings_resource_id_dates'"
-                    + "OR (tablename = 'bookings' AND indexdef LIKE '%resource_id%'"
-                    + "AND indexdef LIKE '%booked_from%' AND indexdef LIKE '%booked_to%')"
             )
             .SingleAsync();
 
@@ -44,7 +42,7 @@ public class Task08_QueryOptimizationTests : IntegrationTestBase
             .BeGreaterThan(
                 0,
                 "Составной индекс на (resource_id, booked_from, booked_to) необходим "
-                    + "для эффективного поиск)а пересечений дат при создании нового бронирования"
+                    + "для эффективного поиска пересечений дат при создании нового бронирования"
             );
     }
 
