@@ -46,8 +46,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         // Применяем все миграции (включая те, что добавлены в задачах)
         await Context.Database.MigrateAsync();
 
-        // BookingRepository мокируем — не нужен реальный репозиторий
-        repository = Substitute.For<BookingRepository>();
+        repository = new BookingRepository(Context);
 
         var publisher = new BookingEventTracker(
             NullLogger<BookingEventTracker>.Instance,

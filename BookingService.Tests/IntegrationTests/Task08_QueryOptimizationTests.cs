@@ -31,11 +31,11 @@ public class Task08_QueryOptimizationTests : IntegrationTestBase
         var indexExists = await Context
             .Database.SqlQueryRaw<int>(
                 "SELECT COUNT(*)::int FROM pg_indexes "
-                    + "WHERE tablename = 'bookings' "
-                    + "AND indexdef LIKE '%resource_id%booked_from%booked_to%' "
-                    + "OR (tablename = 'bookings' AND indexdef LIKE '%resource_id%' "
-                    + "    AND indexdef LIKE '%booked_from%' AND indexdef LIKE '%booked_to%')"
+                    + "WHERE tablename = 'bookings'"
+                    + "AND indexdef LIKE '%resource_id%booked_from%booked_to%'"
                     + "AND indexname = 'idx_bookings_resource_id_dates'"
+                    + "OR (tablename = 'bookings' AND indexdef LIKE '%resource_id%'"
+                    + "AND indexdef LIKE '%booked_from%' AND indexdef LIKE '%booked_to%')"
             )
             .SingleAsync();
 
@@ -44,7 +44,7 @@ public class Task08_QueryOptimizationTests : IntegrationTestBase
             .BeGreaterThan(
                 0,
                 "Составной индекс на (resource_id, booked_from, booked_to) необходим "
-                    + "для эффективного поиска пересечений дат при создании нового бронирования"
+                    + "для эффективного поиск)а пересечений дат при создании нового бронирования"
             );
     }
 
@@ -107,7 +107,8 @@ public class Task08_QueryOptimizationTests : IntegrationTestBase
             .Database.SqlQueryRaw<int>(
                 "SELECT COUNT(*)::int FROM pg_indexes "
                     + "WHERE tablename = 'bookings' "
-                    + "AND indexdef LIKE '%user_id%' AND indexdef LIKE '%status%'"
+                    + "AND indexdef LIKE '%user_id%' "
+                    + "AND indexdef LIKE '%status%'"
                     + "AND indexname = 'idx_bookings_user_id_status'"
             )
             .SingleAsync();
@@ -131,8 +132,10 @@ public class Task08_QueryOptimizationTests : IntegrationTestBase
         var indexExists = await Context
             .Database.SqlQueryRaw<int>(
                 "SELECT COUNT(*)::int FROM pg_indexes "
-                    + "WHERE tablename = 'bookings' AND indexdef LIKE '%created_at%'"
+                    + "WHERE tablename = 'bookings' "
+                    + "AND indexdef LIKE '%created_at%'"
                     + "AND indexname = 'idx_bookings_created_at'"
+                    + "AND indexdef LIKE '%created_at DESC%'"
             )
             .SingleAsync();
 
