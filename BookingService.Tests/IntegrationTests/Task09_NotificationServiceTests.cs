@@ -30,16 +30,23 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
     // Вспомогательный метод: создаёт BookingService с мок-уведомлениями
     // -----------------------------------------------------------------------
 
-    private INotificationService CreateNotificationMock()
-        => Substitute.For<INotificationService>();
+    private static INotificationService CreateNotificationMock()
+    {
+        return Substitute.For<INotificationService>();
+    }
 
-    private Services.BookingService CreateServiceWithNotifications(INotificationService notificationService)
-        => new Services.BookingService(
+    private Services.BookingService CreateServiceWithNotifications(
+        INotificationService notificationService
+    )
+    {
+        return new Services.BookingService(
             new BookingRepository(Context),
-            new BookingEventPublisher(BusMock, NullLogger<BookingEventPublisher>.Instance),
+            new BookingEventTracker(NullLogger<BookingEventTracker>.Instance, repository),
             new CurrentDateTimeProvider(),
             NullLogger<Services.BookingService>.Instance,
-            notificationService: notificationService);
+            notificationService
+        );
+    }
 
     // -----------------------------------------------------------------------
     // Уведомление при подтверждении бронирования
@@ -57,7 +64,8 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
         await service.HandleBookingJobConfirmed(catalogRequestId);
 
         // Assert: уведомление отправлено ровно раз
-        await notificationMock.Received(1)
+        await notificationMock
+            .Received(1)
             .NotifyStatusChangedAsync(bookingId, Arg.Any<BookingStatus>(), BookingStatus.Confirmed);
     }
 
@@ -73,8 +81,13 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
         await service.HandleBookingJobConfirmed(catalogRequestId);
 
         // Assert: в уведомлении передан правильный новый статус
-        await notificationMock.Received(1)
-            .NotifyStatusChangedAsync(bookingId, BookingStatus.AwaitConfirmation, BookingStatus.Confirmed);
+        await notificationMock
+            .Received(1)
+            .NotifyStatusChangedAsync(
+                bookingId,
+                BookingStatus.AwaitConfirmation,
+                BookingStatus.Confirmed
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -95,8 +108,13 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
         await service.CancelBooking(bookingId);
 
         // Assert
-        await notificationMock.Received(1)
-            .NotifyStatusChangedAsync(bookingId, BookingStatus.Confirmed, BookingStatus.CancellationPending);
+        await notificationMock
+            .Received(1)
+            .NotifyStatusChangedAsync(
+                bookingId,
+                BookingStatus.Confirmed,
+                BookingStatus.CancellationPending
+            );
     }
 
     [Fact]
@@ -114,8 +132,13 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
         await service.HandleCancellationError(catalogRequestId);
 
         // Assert
-        await notificationMock.Received(1)
-            .NotifyStatusChangedAsync(bookingId, BookingStatus.CancellationPending, BookingStatus.Confirmed);
+        await notificationMock
+            .Received(1)
+            .NotifyStatusChangedAsync(
+                bookingId,
+                BookingStatus.CancellationPending,
+                BookingStatus.Confirmed
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -127,7 +150,8 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
     {
         // Arrange: симулируем недоступность Notification Service
         var notificationMock = CreateNotificationMock();
-        notificationMock.NotifyStatusChangedAsync(default, default, default)
+        notificationMock
+            .NotifyStatusChangedAsync(default, default, default)
             .ThrowsAsyncForAnyArgs(new HttpRequestException("Notification Service unavailable"));
 
         var service = CreateServiceWithNotifications(notificationMock);
@@ -137,9 +161,11 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
         var act = async () => await service.HandleBookingJobConfirmed(catalogRequestId);
 
         // Assert: основной сценарий не должен падать из-за проблем с уведомлением
-        await act.Should().NotThrowAsync(
-            because: "Ошибка Notification Service (недоступность, таймаут, 5xx) " +
-                     "должна обрабатываться gracefully — бронирование уже подтверждено");
+        await act.Should()
+            .NotThrowAsync(
+                "Ошибка Notification Service (недоступность, таймаут, 5xx) "
+                    + "должна обрабатываться gracefully — бронирование уже подтверждено"
+            );
     }
 
     [Fact]
@@ -147,7 +173,8 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
     {
         // Arrange
         var notificationMock = CreateNotificationMock();
-        notificationMock.NotifyStatusChangedAsync(default, default, default)
+        notificationMock
+            .NotifyStatusChangedAsync(default, default, default)
             .ThrowsAsyncForAnyArgs(new HttpRequestException("Notification Service unavailable"));
 
         var service = CreateServiceWithNotifications(notificationMock);
@@ -158,8 +185,12 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
 
         // Assert: статус бронирования изменился, несмотря на ошибку уведомления
         var booking = await Context.Bookings.FindAsync(bookingId);
-        booking!.Status.Should().Be(BookingStatus.Confirmed,
-            because: "Статус бронирования должен быть сохранён в БД независимо от результата уведомления");
+        booking!
+            .Status.Should()
+            .Be(
+                BookingStatus.Confirmed,
+                "Статус бронирования должен быть сохранён в БД независимо от результата уведомления"
+            );
     }
 
     [Fact]
@@ -171,15 +202,18 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
         var (bookingId, catalogRequestId) = await CreateBookingAsync();
         await service.HandleBookingJobConfirmed(catalogRequestId);
 
-        notificationMock.NotifyStatusChangedAsync(default, default, default)
+        notificationMock
+            .NotifyStatusChangedAsync(default, default, default)
             .ThrowsAsyncForAnyArgs(new HttpRequestException("503 Service Unavailable"));
 
         // Act
         var act = async () => await service.CancelBooking(bookingId);
 
         // Assert
-        await act.Should().NotThrowAsync(
-            because: "Недоступность Notification Service при отмене не должна откатывать отмену бронирования");
+        await act.Should()
+            .NotThrowAsync(
+                "Недоступность Notification Service при отмене не должна откатывать отмену бронирования"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -198,7 +232,8 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
         await service.HandleBookingJobConfirmed(unknownRequestId);
 
         // Assert
-        await notificationMock.DidNotReceiveWithAnyArgs()
+        await notificationMock
+            .DidNotReceiveWithAnyArgs()
             .NotifyStatusChangedAsync(default, default, default);
     }
 
@@ -217,7 +252,8 @@ public class Task09_NotificationServiceTests : IntegrationTestBase
         await service.HandleBookingJobConfirmed(catalogRequestId);
 
         // Assert: раз статус не изменился — уведомление тоже не отправляется
-        await notificationMock.DidNotReceiveWithAnyArgs()
+        await notificationMock
+            .DidNotReceiveWithAnyArgs()
             .NotifyStatusChangedAsync(default, default, default);
     }
 }

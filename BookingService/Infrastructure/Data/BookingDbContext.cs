@@ -87,6 +87,29 @@ public class BookingDbContext : DbContext
             entity.HasIndex(b => b.ResourceId).HasDatabaseName("idx_bookings_resource_id");
 
             entity
+                .HasIndex(booking => booking.CatalogRequestId)
+                .HasDatabaseName("idx_bookings_catalog_request_id")
+                .IsUnique();
+
+            entity
+                .HasIndex(booking => new { booking.UserId, booking.Status })
+                .HasDatabaseName("idx_bookings_user_id_status");
+
+            entity
+                .HasIndex(booking => new
+                {
+                    booking.ResourceId,
+                    booking.BookedFrom,
+                    booking.BookedTo,
+                })
+                .HasDatabaseName("idx_bookings_resource_id_dates");
+
+            entity
+                .HasIndex(booking => booking.CreatedAt)
+                .IsDescending()
+                .HasDatabaseName("idx_bookings_created_at");
+
+            entity
                 .Property(b => b.Version)
                 .HasColumnName("xmin")
                 .HasColumnType("xid")

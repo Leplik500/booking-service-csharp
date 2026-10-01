@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using BookingService.Dto.Response;
 using BookingService.Entities;
 using Microsoft.EntityFrameworkCore;

@@ -175,7 +175,7 @@ public class BookingService
     /// Обработать событие подтверждения booking job от Catalog Service.
     /// Переводит бронирование в статус Confirmed.
     /// </summary>
-    public async Task HandleBookingJobConfirmed(Guid requestId, Guid eventId)
+    public async Task HandleBookingJobConfirmed(Guid requestId, Guid eventId = default)
     {
         _logger.LogInformation(
             "Получено событие BookingJobConfirmed: requestId={RequestId}",
@@ -288,7 +288,7 @@ public class BookingService
     /// Обработать событие отклонения booking job от Catalog Service.
     /// Отменяет бронирование.
     /// </summary>
-    public async Task HandleBookingJobDenied(Guid requestId, Guid eventId)
+    public async Task HandleBookingJobDenied(Guid requestId, Guid eventId = default)
     {
         _logger.LogInformation(
             "Получено событие BookingJobDenied: requestId={RequestId}",
@@ -380,7 +380,7 @@ public class BookingService
     /// </summary>
     /// <param name="requestId"></param>
     /// <param name="eventId"></param>
-    public async Task HandleCancellationError(Guid requestId, Guid eventId)
+    public async Task HandleCancellationError(Guid requestId, Guid eventId = default)
     {
         _logger.LogWarning(
             "Произошла ошибка отмены бронирования: requestId={RequestId}",
@@ -464,7 +464,7 @@ public class BookingService
     /// <summary>Вернуть историю изменений статусов для указанного бронирования</summary>
     public async Task<List<BookingStatusHistory>> GetBookingHistory(
         long bookingId,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken = default
     )
     {
         await GetById(bookingId);

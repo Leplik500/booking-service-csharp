@@ -1,4 +1,3 @@
-using BookingService.Entities;
 using BookingService.Infrastructure.Data;
 using BookingService.Infrastructure.Messaging.Contracts;
 
