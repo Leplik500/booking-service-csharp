@@ -3,12 +3,14 @@ using BookingService.Exceptions;
 using BookingService.Infrastructure.Data;
 using BookingService.Infrastructure.Messaging;
 using BookingService.Infrastructure.Messaging.Contracts;
+using BookingService.Infrastructure.Notifications;
 using BookingService.Mappers;
 using BookingService.Services;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Polly;
 using Rebus.Config;
 using Rebus.Routing.TypeBased;
 
@@ -16,6 +18,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ---- Configuration ----
 var rabbitMqSettings = builder.Configuration.GetSection("RabbitMq").Get<RabbitMqSettings>()!;
+var notificationsConfigSection = builder.Configuration.GetSection("NotificationService");
+var notificationsSettings = notificationsConfigSection.Get<NotificationServiceSettings>()!;
+builder.Services.Configure<NotificationServiceSettings>(notificationsConfigSection);
 
 // ---- Controllers & OpenAPI ----
 builder
@@ -29,10 +34,7 @@ builder
     });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Booking Service", Version = "v1" });
-});
+builder.Services.AddSwaggerGen(c => { c.SwaggerDoc("v1", new OpenApiInfo {Title = "Booking Service", Version = "v1"}); });
 
 // ---- Database ----
 builder.Services.AddDbContext<BookingDbContext>(options =>
@@ -44,9 +46,18 @@ builder.Services.AddScoped<BookingRepository>();
 // ---- Business Services ----
 builder.Services.AddScoped<BookingService.Services.BookingService>();
 builder.Services.AddScoped<BookingMapper>();
+
 builder.Services.AddSingleton<ICurrentDateTimeProvider, CurrentDateTimeProvider>();
 builder.Services.AddHostedService<StuckCancellationsJob>();
 builder.Services.AddHostedService<OutboxProcessorJob>();
+
+var clientBuilder = builder.Services.AddHttpClient<INotificationService, NotificationService>();
+clientBuilder.AddStandardResilienceHandler(options =>
+{
+    options.Retry.BackoffType = DelayBackoffType.Constant;
+    options.Retry.MaxRetryAttempts = notificationsSettings.MaxAttempts;
+    options.Retry.Delay = TimeSpan.FromSeconds(notificationsSettings.DelaySeconds);
+});
 
 // ---- Messaging (Rebus + RabbitMQ) ----
 builder.Services.AddSingleton(rabbitMqSettings);
@@ -102,7 +113,7 @@ app.UseExceptionHandler(exceptionApp =>
             {
                 Status = StatusCodes.Status400BadRequest,
                 Title = "Business Error",
-                Detail = businessEx.Message,
+                Detail = businessEx.Message
             };
 
             await context.Response.WriteAsJsonAsync(problem);
@@ -119,7 +130,7 @@ app.UseExceptionHandler(exceptionApp =>
             {
                 Status = StatusCodes.Status500InternalServerError,
                 Title = "Internal Server Error",
-                Detail = "An unexpected error occurred",
+                Detail = "An unexpected error occurred"
             };
 
             await context.Response.WriteAsJsonAsync(problem);
