@@ -12,7 +12,7 @@ namespace BookingService.Tests.IntegrationTests;
 /// 2. Событие содержит корректные BookingId, OldStatus, NewStatus
 /// 3. Событие НЕ публикуется при вызовах-no-op (не найдено, гард от гонки)
 ///
-/// Тесты проверяют факт публикации через BusMock.ReceivedCalls() без прямой
+/// Тесты проверяют факт публикации через repository.ReceivedCalls() без прямой
 /// ссылки на тип BookingStatusChangedEvent — это позволяет тестам компилироваться
 /// до реализации, обнаруживая отсутствие публикации как провал теста.
 /// </summary>
@@ -27,11 +27,14 @@ public class Task06_DomainEventsTests : IntegrationTestBase
     /// с именем "BookingStatusChangedEvent". Не требует ссылки на тип.
     /// </summary>
     private IReadOnlyList<object?> GetStatusChangedEventArgs()
-        => BusMock.ReceivedCalls()
+    {
+        return repository
+            .ReceivedCalls()
             .Where(c => c.GetMethodInfo().Name == nameof(Rebus.Bus.IBus.Publish))
             .Select(c => c.GetArguments().FirstOrDefault())
             .Where(arg => arg?.GetType().Name == "BookingStatusChangedEvent")
             .ToList();
+    }
 
     private static T GetProperty<T>(object obj, string propertyName)
     {
@@ -39,7 +42,8 @@ public class Task06_DomainEventsTests : IntegrationTestBase
         return value is T typed
             ? typed
             : throw new InvalidOperationException(
-                $"Свойство {propertyName} не найдено или имеет неверный тип на {obj.GetType().Name}");
+                $"Свойство {propertyName} не найдено или имеет неверный тип на {obj.GetType().Name}"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -57,8 +61,9 @@ public class Task06_DomainEventsTests : IntegrationTestBase
 
         // Assert: событие было опубликовано
         var eventArgs = GetStatusChangedEventArgs();
-        eventArgs.Should().NotBeEmpty(
-            because: "Подтверждение бронирования должно публиковать BookingStatusChangedEvent");
+        eventArgs
+            .Should()
+            .NotBeEmpty("Подтверждение бронирования должно публиковать BookingStatusChangedEvent");
     }
 
     [Fact]
@@ -72,9 +77,12 @@ public class Task06_DomainEventsTests : IntegrationTestBase
 
         // Assert: событие содержит правильный BookingId
         var events = GetStatusChangedEventArgs();
-        events.Should().Contain(e =>
-            e != null && GetProperty<long>(e, "BookingId") == bookingId,
-            because: "Событие BookingStatusChangedEvent должно содержать корректный BookingId");
+        events
+            .Should()
+            .Contain(
+                e => e != null && GetProperty<long>(e, "BookingId") == bookingId,
+                "Событие BookingStatusChangedEvent должно содержать корректный BookingId"
+            );
     }
 
     [Fact]
@@ -88,10 +96,14 @@ public class Task06_DomainEventsTests : IntegrationTestBase
 
         // Assert: OldStatus = AwaitConfirmation, NewStatus = Confirmed
         var events = GetStatusChangedEventArgs();
-        events.Should().Contain(e =>
-            e != null &&
-            GetProperty<BookingStatus>(e, "NewStatus") == BookingStatus.Confirmed,
-            because: "BookingStatusChangedEvent должен отражать переход в статус Confirmed");
+        events
+            .Should()
+            .Contain(
+                e =>
+                    e != null
+                    && GetProperty<BookingStatus>(e, "NewStatus") == BookingStatus.Confirmed,
+                "BookingStatusChangedEvent должен отражать переход в статус Confirmed"
+            );
     }
 
     [Fact]
@@ -102,15 +114,18 @@ public class Task06_DomainEventsTests : IntegrationTestBase
         await ConfirmBookingAsync(catalogRequestId);
 
         // Сбрасываем счётчик вызовов, чтобы считать только события отмены
-        BusMock.ClearReceivedCalls();
+        repository.ClearReceivedCalls();
 
         // Act
         await BookingService.CancelBooking(bookingId);
 
         // Assert
         var events = GetStatusChangedEventArgs();
-        events.Should().NotBeEmpty(
-            because: "Запрос отмены подтверждённого бронирования должен публиковать BookingStatusChangedEvent");
+        events
+            .Should()
+            .NotBeEmpty(
+                "Запрос отмены подтверждённого бронирования должен публиковать BookingStatusChangedEvent"
+            );
     }
 
     [Fact]
@@ -118,15 +133,18 @@ public class Task06_DomainEventsTests : IntegrationTestBase
     {
         // Arrange: AwaitConfirmation → Cancelled (прямая отмена)
         var (bookingId, _) = await CreateBookingAsync();
-        BusMock.ClearReceivedCalls();
+        repository.ClearReceivedCalls();
 
         // Act
         await BookingService.CancelBooking(bookingId);
 
         // Assert
         var events = GetStatusChangedEventArgs();
-        events.Should().NotBeEmpty(
-            because: "Прямая отмена неподтверждённого бронирования также должна публиковать событие");
+        events
+            .Should()
+            .NotBeEmpty(
+                "Прямая отмена неподтверждённого бронирования также должна публиковать событие"
+            );
     }
 
     [Fact]
@@ -136,15 +154,16 @@ public class Task06_DomainEventsTests : IntegrationTestBase
         var (bookingId, catalogRequestId) = await CreateBookingAsync();
         await ConfirmBookingAsync(catalogRequestId);
         await BookingService.CancelBooking(bookingId);
-        BusMock.ClearReceivedCalls();
+        repository.ClearReceivedCalls();
 
         // Act
         await BookingService.HandleCancellationError(catalogRequestId);
 
         // Assert
         var events = GetStatusChangedEventArgs();
-        events.Should().NotBeEmpty(
-            because: "Компенсирующая транзакция должна публиковать BookingStatusChangedEvent");
+        events
+            .Should()
+            .NotBeEmpty("Компенсирующая транзакция должна публиковать BookingStatusChangedEvent");
     }
 
     // -----------------------------------------------------------------------
@@ -162,8 +181,7 @@ public class Task06_DomainEventsTests : IntegrationTestBase
 
         // Assert: событие не публикуется для несуществующего бронирования
         var events = GetStatusChangedEventArgs();
-        events.Should().BeEmpty(
-            because: "Если бронирование не найдено, событие публиковаться не должно");
+        events.Should().BeEmpty("Если бронирование не найдено, событие публиковаться не должно");
     }
 
     [Fact]
@@ -175,14 +193,17 @@ public class Task06_DomainEventsTests : IntegrationTestBase
         await BookingService.CancelBooking(bookingId);
 
         // Сбрасываем вызовы после перехода в CancellationPending
-        BusMock.ClearReceivedCalls();
+        repository.ClearReceivedCalls();
 
         // Act: запоздалое подтверждение — должно быть проигнорировано
         await BookingService.HandleBookingJobConfirmed(catalogRequestId);
 
         // Assert: статус не изменился → событие тоже не публикуется
         var events = GetStatusChangedEventArgs();
-        events.Should().BeEmpty(
-            because: "Игнорируемое (no-op) событие не должно порождать публикацию BookingStatusChangedEvent");
+        events
+            .Should()
+            .BeEmpty(
+                "Игнорируемое (no-op) событие не должно порождать публикацию BookingStatusChangedEvent"
+            );
     }
 }

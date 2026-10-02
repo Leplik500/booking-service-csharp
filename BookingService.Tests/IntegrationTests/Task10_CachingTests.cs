@@ -33,15 +33,20 @@ public class Task10_CachingTests : IntegrationTestBase
     // -----------------------------------------------------------------------
 
     private static IMemoryCache CreateFreshCache()
-        => new MemoryCache(new MemoryCacheOptions());
+    {
+        return new MemoryCache(new MemoryCacheOptions());
+    }
 
     private Services.BookingService CreateServiceWithCache(IMemoryCache cache)
-        => new Services.BookingService(
+    {
+        return new Services.BookingService(
             new BookingRepository(Context),
-            new BookingEventPublisher(BusMock, NullLogger<BookingEventPublisher>.Instance),
+            new BookingEventTracker(NullLogger<BookingEventTracker>.Instance, repository),
             new CurrentDateTimeProvider(),
             NullLogger<Services.BookingService>.Instance,
-            cache: cache);
+            cache: cache
+        );
+    }
 
     // -----------------------------------------------------------------------
     // Кэш работает: повторный вызов возвращает кэшированный результат
@@ -60,20 +65,27 @@ public class Task10_CachingTests : IntegrationTestBase
 
         // Вставляем запись напрямую в БД (обходя сервис, чтобы не инвалидировать кэш)
         await Context.Database.ExecuteSqlRawAsync(
-            "INSERT INTO bookings (status, user_id, resource_id, booked_from, booked_to, created_at) " +
-            "VALUES ({0}, {1}, {2}, {3}, {4}, {5})",
-            (int)BookingStatus.AwaitConfirmation, 99L, 99L,
+            "INSERT INTO bookings (status, user_id, resource_id, booked_from, booked_to, created_at) "
+                + "VALUES ({0}, {1}, {2}, {3}, {4}, {5})",
+            (int)BookingStatus.AwaitConfirmation,
+            99L,
+            99L,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(13)),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow
+        );
 
         // Act: второй вызов — должен вернуть кэшированный результат (0), не актуальный из БД (1)
         var secondResult = await service.GetStatistics();
 
         // Assert
-        secondResult.TotalCount.Should().Be(0,
-            because: "Второй вызов GetStatistics должен вернуть кэшированный результат, " +
-                     "а не читать из БД — прямая вставка не инвалидирует кэш");
+        secondResult
+            .TotalCount.Should()
+            .Be(
+                0,
+                "Второй вызов GetStatistics должен вернуть кэшированный результат, "
+                    + "а не читать из БД — прямая вставка не инвалидирует кэш"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -96,9 +108,13 @@ public class Task10_CachingTests : IntegrationTestBase
 
         // Assert: следующий вызов должен показать актуальные данные
         var freshStats = await service.GetStatistics();
-        freshStats.TotalCount.Should().Be(1,
-            because: "После CreateBooking кэш должен быть инвалидирован — " +
-                     "GetStatistics должен вернуть актуальное число бронирований");
+        freshStats
+            .TotalCount.Should()
+            .Be(
+                1,
+                "После CreateBooking кэш должен быть инвалидирован — "
+                    + "GetStatistics должен вернуть актуальное число бронирований"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -115,20 +131,28 @@ public class Task10_CachingTests : IntegrationTestBase
 
         // Первый вызов: кэш прогрет, статистика содержит AwaitConfirmation
         var beforeCancel = await service.GetStatistics();
-        var awaitCountBefore = beforeCancel.ByStatus
-            .FirstOrDefault(s => s.Status == BookingStatus.AwaitConfirmation)?.Count ?? 0;
+        var awaitCountBefore =
+            beforeCancel
+                .ByStatus.FirstOrDefault(s => s.Status == BookingStatus.AwaitConfirmation)
+                ?.Count
+            ?? 0;
 
         // Act: отмена → переводит в Cancelled → инвалидирует кэш
         await service.CancelBooking(bookingId);
 
         // Assert: следующий вызов должен отразить новый статус
         var afterCancel = await service.GetStatistics();
-        var cancelledCount = afterCancel.ByStatus
-            .FirstOrDefault(s => s.Status == BookingStatus.Cancelled)?.Count ?? 0;
+        var cancelledCount =
+            afterCancel.ByStatus.FirstOrDefault(s => s.Status == BookingStatus.Cancelled)?.Count
+            ?? 0;
 
-        cancelledCount.Should().BeGreaterThan(0,
-            because: "После CancelBooking кэш должен быть инвалидирован и возвращать " +
-                     "актуальную разбивку по статусам, включая Cancelled");
+        cancelledCount
+            .Should()
+            .BeGreaterThan(
+                0,
+                "После CancelBooking кэш должен быть инвалидирован и возвращать "
+                    + "актуальную разбивку по статусам, включая Cancelled"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -151,12 +175,16 @@ public class Task10_CachingTests : IntegrationTestBase
 
         // Assert: разбивка по статусам обновилась
         var stats = await service.GetStatistics();
-        var confirmedCount = stats.ByStatus
-            .FirstOrDefault(s => s.Status == BookingStatus.Confirmed)?.Count ?? 0;
+        var confirmedCount =
+            stats.ByStatus.FirstOrDefault(s => s.Status == BookingStatus.Confirmed)?.Count ?? 0;
 
-        confirmedCount.Should().BeGreaterThan(0,
-            because: "После HandleBookingJobConfirmed кэш должен инвалидироваться, " +
-                     "а статус Confirmed должен появиться в статистике");
+        confirmedCount
+            .Should()
+            .BeGreaterThan(
+                0,
+                "После HandleBookingJobConfirmed кэш должен инвалидироваться, "
+                    + "а статус Confirmed должен появиться в статистике"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -175,8 +203,9 @@ public class Task10_CachingTests : IntegrationTestBase
 
         // Assert: без кэша следующий вызов всегда актуален
         var statsAfter = await BookingService.GetStatistics();
-        statsAfter.TotalCount.Should().Be(1,
-            because: "Без кэша каждый GetStatistics() читает из БД и возвращает актуальные данные");
+        statsAfter
+            .TotalCount.Should()
+            .Be(1, "Без кэша каждый GetStatistics() читает из БД и возвращает актуальные данные");
     }
 
     // -----------------------------------------------------------------------
@@ -197,18 +226,25 @@ public class Task10_CachingTests : IntegrationTestBase
 
         // Вставляем бронирование для другого ресурса (100) напрямую в БД
         await Context.Database.ExecuteSqlRawAsync(
-            "INSERT INTO bookings (status, user_id, resource_id, booked_from, booked_to, created_at) " +
-            "VALUES ({0}, {1}, {2}, {3}, {4}, {5})",
-            (int)BookingStatus.AwaitConfirmation, 88L, 100L,
+            "INSERT INTO bookings (status, user_id, resource_id, booked_from, booked_to, created_at) "
+                + "VALUES ({0}, {1}, {2}, {3}, {4}, {5})",
+            (int)BookingStatus.AwaitConfirmation,
+            88L,
+            100L,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(13)),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow
+        );
 
         // Act: повторный вызов — должен вернуть кэш
         var stillCachedStats = await service.GetStatistics();
 
         // Assert: ресурс 100 не должен появиться (он был добавлен в обход кэша)
-        stillCachedStats.TopResources.Should().NotContain(r => r.ResourceId == 100,
-            because: "TopResources также должно кэшироваться — прямая вставка не инвалидирует кэш");
+        stillCachedStats
+            .TopResources.Should()
+            .NotContain(
+                r => r.ResourceId == 100,
+                "TopResources также должно кэшироваться — прямая вставка не инвалидирует кэш"
+            );
     }
 }

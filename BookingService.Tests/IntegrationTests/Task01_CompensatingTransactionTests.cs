@@ -28,9 +28,13 @@ public class Task01_CompensatingTransactionTests : IntegrationTestBase
 
         // Assert
         var booking = await Context.Bookings.FindAsync(bookingId);
-        booking!.Status.Should().Be(BookingStatus.CancellationPending,
-            because: "Confirmed-бронирование при отмене должно переходить в CancellationPending, " +
-                     "а не сразу в Cancelled — это обеспечивает возможность отката при ошибке Catalog Service");
+        booking!
+            .Status.Should()
+            .Be(
+                BookingStatus.CancellationPending,
+                "Confirmed-бронирование при отмене должно переходить в CancellationPending, "
+                    + "а не сразу в Cancelled — это обеспечивает возможность отката при ошибке Catalog Service"
+            );
     }
 
     [Fact]
@@ -45,8 +49,11 @@ public class Task01_CompensatingTransactionTests : IntegrationTestBase
 
         // Assert
         var booking = await Context.Bookings.FindAsync(bookingId);
-        booking!.CancellationRequestedAt.Should().NotBeNull(
-            because: "Метка времени необходима для поиска зависших отмен фоновым job'ом (Задача 03)");
+        booking!
+            .CancellationRequestedAt.Should()
+            .NotBeNull(
+                "Метка времени необходима для поиска зависших отмен фоновым job'ом (Задача 03)"
+            );
     }
 
     [Fact]
@@ -60,9 +67,13 @@ public class Task01_CompensatingTransactionTests : IntegrationTestBase
 
         // Assert: для AwaitConfirmation отмена по-прежнему немедленная
         var booking = await Context.Bookings.FindAsync(bookingId);
-        booking!.Status.Should().Be(BookingStatus.Cancelled,
-            because: "Бронирование в AwaitConfirmation не имеет резервации в Catalog, " +
-                     "поэтому отмена может быть немедленной — промежуточный статус не нужен");
+        booking!
+            .Status.Should()
+            .Be(
+                BookingStatus.Cancelled,
+                "Бронирование в AwaitConfirmation не имеет резервации в Catalog, "
+                    + "поэтому отмена может быть немедленной — промежуточный статус не нужен"
+            );
     }
 
     [Fact]
@@ -81,11 +92,17 @@ public class Task01_CompensatingTransactionTests : IntegrationTestBase
 
         // Assert
         await Context.Entry(booking).ReloadAsync();
-        booking.Status.Should().Be(BookingStatus.Confirmed,
-            because: "DLQ-ошибка означает, что Catalog Service не обработал команду отмены — " +
-                     "компенсирующая транзакция должна вернуть статус в Confirmed");
-        booking.CancellationRequestedAt.Should().BeNull(
-            because: "После отката метка времени должна очищаться");
+        booking
+            .Status.Should()
+            .Be(
+                BookingStatus.Confirmed,
+                "DLQ-ошибка означает, что Catalog Service не обработал команду отмены — "
+                    + "компенсирующая транзакция должна вернуть статус в Confirmed"
+            );
+
+        booking
+            .CancellationRequestedAt.Should()
+            .BeNull("После отката метка времени должна очищаться");
     }
 
     [Fact]
@@ -96,8 +113,11 @@ public class Task01_CompensatingTransactionTests : IntegrationTestBase
 
         // Act & Assert: не должно бросать исключений
         var act = async () => await BookingService.HandleCancellationError(unknownRequestId);
-        await act.Should().NotThrowAsync(
-            because: "Если бронирование не найдено, DLQ-событие должно быть проигнорировано без ошибки");
+
+        await act.Should()
+            .NotThrowAsync(
+                "Если бронирование не найдено, DLQ-событие должно быть проигнорировано без ошибки"
+            );
     }
 
     [Fact]
@@ -112,20 +132,30 @@ public class Task01_CompensatingTransactionTests : IntegrationTestBase
 
         // Assert: статус не должен измениться
         var booking = await Context.Bookings.FindAsync(bookingId);
-        booking!.Status.Should().Be(BookingStatus.Confirmed,
-            because: "Дублированное или запоздалое DLQ-событие не должно ломать уже подтверждённое бронирование");
+        booking!
+            .Status.Should()
+            .Be(
+                BookingStatus.Confirmed,
+                "Дублированное или запоздалое DLQ-событие не должно ломать уже подтверждённое бронирование"
+            );
     }
 
     [Fact]
     public async Task Migration_CancellationRequestedAt_ColumnExists()
     {
         // Проверяем, что колонка добавлена миграцией
-        var columnExists = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM information_schema.columns " +
-            "WHERE table_name = 'bookings' AND column_name = 'cancellation_requested_at'")
+        var columnExists = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM information_schema.columns "
+                    + "WHERE table_name = 'bookings' AND column_name = 'cancellation_requested_at'"
+            )
             .SingleAsync();
 
-        columnExists.Should().Be(1,
-            because: "Миграция AddCancellationRequestedAt должна добавить колонку cancellation_requested_at");
+        columnExists
+            .Should()
+            .Be(
+                1,
+                "Миграция AddCancellationRequestedAt должна добавить колонку cancellation_requested_at"
+            );
     }
 }
