@@ -123,7 +123,7 @@ public class BookingService
         }
 
         await _repository.SaveAsync(booking);
-
+        await _notificationService.NotifySafeAsync(booking.Id, oldStatus, newStatus, _logger);
         _logger.LogInformation(
             "Инициирована отмена бронирования с ID: {Id}, новый статус: {Status}",
             id,
@@ -238,6 +238,13 @@ public class BookingService
                 booking.Confirm();
 
                 await _repository.SaveAsync(booking);
+                var newStatus = booking.Status;
+                await _notificationService.NotifySafeAsync(
+                    booking.Id,
+                    oldStatus,
+                    newStatus,
+                    _logger
+                );
 
                 _logger.LogInformation(
                     "Бронирование успешно подтверждено: id={Id}, новый статус={Status}",
@@ -356,6 +363,7 @@ public class BookingService
             );
 
             await _repository.SaveAsync(booking);
+            await _notificationService.NotifySafeAsync(booking.Id, oldStatus, newStatus, _logger);
         }
         catch (DbUpdateException e)
             when (e.InnerException is PostgresException { SqlState: "23505" })
@@ -442,6 +450,7 @@ public class BookingService
             );
 
             await _repository.SaveAsync(booking);
+            await _notificationService.NotifySafeAsync(booking.Id, oldStatus, newStatus, _logger);
         }
         catch (DbUpdateException e)
             when (e.InnerException is PostgresException { SqlState: "23505" })
