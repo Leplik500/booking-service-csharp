@@ -1,4 +1,5 @@
 using BookingService.Configuration;
+using BookingService.Dto.Request;
 using BookingService.Entities;
 using Microsoft.Extensions.Options;
 using Polly.CircuitBreaker;
@@ -9,15 +10,17 @@ namespace BookingService.Infrastructure.Notifications;
 public class NotificationService : INotificationService
 {
     private readonly ILogger<NotificationService> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly HttpClient _httpClient;
     private readonly NotificationServiceSettings _options;
 
-    public NotificationService(ILogger<NotificationService> logger,
-        IHttpClientFactory httpClientFactory,
-        IOptions<NotificationServiceSettings> options)
+    public NotificationService(
+        ILogger<NotificationService> logger,
+        HttpClient httpClient,
+        IOptions<NotificationServiceSettings> options
+    )
     {
         _logger = logger;
-        _httpClientFactory = httpClientFactory;
+        _httpClient = httpClient;
         _options = options.Value;
     }
 
@@ -29,19 +32,27 @@ public class NotificationService : INotificationService
     {
         try
         {
-            var httpClient = _httpClientFactory.CreateClient(nameof(NotificationService));
-            using var response = await httpClient.PostAsync(
-                _options.BaseUrl,
-                new StringContent(
-                    $"Бронирование {bookingId} перешло из статуса {oldStatus} в {newStatus}"
-                )
+            using var response = await _httpClient.PostAsJsonAsync(
+                "/api/notifications",
+                new PostNotificationRequest(bookingId, oldStatus, newStatus)
             );
 
             response.EnsureSuccessStatusCode();
         }
-        catch (Exception exception) when (exception is HttpRequestException or TimeoutRejectedException or BrokenCircuitException)
+        catch (Exception exception)
+            when (exception
+                    is HttpRequestException
+                        or TimeoutRejectedException
+                        or BrokenCircuitException
+            )
         {
-            _logger.LogWarning(exception, "Уведомление не было доставлено после всех {MaxAttemtps} попыток", _options.MaxAttempts);
+            _logger.LogWarning(
+                exception,
+                "Уведомление не было доставлено: oldStatus={OldStatus}, newStatus={NewStatus}, bookingId={BookingId}",
+                oldStatus,
+                newStatus,
+                bookingId
+            );
         }
     }
 }

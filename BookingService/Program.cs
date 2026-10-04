@@ -34,7 +34,10 @@ builder
     });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c => { c.SwaggerDoc("v1", new OpenApiInfo {Title = "Booking Service", Version = "v1"}); });
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Booking Service", Version = "v1" });
+});
 
 // ---- Database ----
 builder.Services.AddDbContext<BookingDbContext>(options =>
@@ -51,12 +54,15 @@ builder.Services.AddSingleton<ICurrentDateTimeProvider, CurrentDateTimeProvider>
 builder.Services.AddHostedService<StuckCancellationsJob>();
 builder.Services.AddHostedService<OutboxProcessorJob>();
 
-var clientBuilder = builder.Services.AddHttpClient<INotificationService, NotificationService>();
+var clientBuilder = builder.Services.AddHttpClient<INotificationService, NotificationService>(
+    client => client.BaseAddress = new Uri(notificationsSettings.Retry.BaseUrl)
+);
+
 clientBuilder.AddStandardResilienceHandler(options =>
 {
     options.Retry.BackoffType = DelayBackoffType.Constant;
-    options.Retry.MaxRetryAttempts = notificationsSettings.MaxAttempts;
-    options.Retry.Delay = TimeSpan.FromSeconds(notificationsSettings.DelaySeconds);
+    options.Retry.MaxRetryAttempts = notificationsSettings.Retry.MaxAttempts;
+    options.Retry.Delay = TimeSpan.FromSeconds(notificationsSettings.Retry.DelaySeconds);
 });
 
 // ---- Messaging (Rebus + RabbitMQ) ----
@@ -113,7 +119,7 @@ app.UseExceptionHandler(exceptionApp =>
             {
                 Status = StatusCodes.Status400BadRequest,
                 Title = "Business Error",
-                Detail = businessEx.Message
+                Detail = businessEx.Message,
             };
 
             await context.Response.WriteAsJsonAsync(problem);
@@ -130,7 +136,7 @@ app.UseExceptionHandler(exceptionApp =>
             {
                 Status = StatusCodes.Status500InternalServerError,
                 Title = "Internal Server Error",
-                Detail = "An unexpected error occurred"
+                Detail = "An unexpected error occurred",
             };
 
             await context.Response.WriteAsJsonAsync(problem);

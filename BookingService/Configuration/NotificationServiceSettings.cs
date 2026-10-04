@@ -5,6 +5,11 @@ namespace BookingService.Configuration;
 /// </summary>
 public class NotificationServiceSettings
 {
+    public Retry Retry { get; set; }
+}
+
+public abstract class Retry
+{
     /// <summary>
     /// Максимальное количество повторных попыток отправить уведомление
     /// </summary>
