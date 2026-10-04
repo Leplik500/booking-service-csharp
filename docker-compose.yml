@@ -30,7 +30,7 @@ services:
       POSTGRES_PASSWORD: "admin_booking"
       PGDATA: /data/postgres
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U booking_admin -d postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U booking_admin -d postgres" ]
       interval: 5s
       timeout: 10s
       retries: 5
@@ -48,7 +48,7 @@ services:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 5s
       timeout: 10s
       retries: 3
@@ -96,12 +96,23 @@ services:
       POSTGRES_PASSWORD: "admin_catalog"
       PGDATA: /data/postgres
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U catalog_admin -d postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U catalog_admin -d postgres" ]
       interval: 5s
       timeout: 10s
       retries: 5
     volumes:
       - catalog-db-data:/data/postgres
+
+  notification-mock:
+    image: wiremock/wiremock:latest
+    container_name: notification-service-mock
+    ports:
+      - "9000:8080"
+    volumes:
+      - ./notification-mock/mappings:/home/wiremock/mappings
+    command:
+      - --global-response-templating
+      - --verbose
 
 volumes:
   booking-db-data:

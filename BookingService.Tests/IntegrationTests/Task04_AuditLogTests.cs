@@ -23,13 +23,16 @@ public class Task04_AuditLogTests : IntegrationTestBase
     [Fact]
     public async Task Migration_BookingStatusHistoryTable_Exists()
     {
-        var tableExists = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM information_schema.tables " +
-            "WHERE table_schema = 'public' AND table_name = 'booking_status_history'")
+        var tableExists = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM information_schema.tables "
+                    + "WHERE table_schema = 'public' AND table_name = 'booking_status_history'"
+            )
             .SingleAsync();
 
-        tableExists.Should().Be(1,
-            because: "Миграция задачи 04 должна создать таблицу booking_status_history");
+        tableExists
+            .Should()
+            .Be(1, "Миграция задачи 04 должна создать таблицу booking_status_history");
     }
 
     [Fact]
@@ -37,19 +40,26 @@ public class Task04_AuditLogTests : IntegrationTestBase
     {
         var requiredColumns = new[]
         {
-            "id", "booking_id", "status_from", "status_to", "changed_at"
+            "id",
+            "booking_id",
+            "status_from",
+            "status_to",
+            "changed_at",
         };
 
         foreach (var column in requiredColumns)
         {
-            var exists = await Context.Database.SqlQueryRaw<int>(
-                "SELECT COUNT(*)::int FROM information_schema.columns " +
-                "WHERE table_name = 'booking_status_history' AND column_name = {0}",
-                column)
+            var exists = await Context
+                .Database.SqlQueryRaw<int>(
+                    "SELECT COUNT(*)::int FROM information_schema.columns "
+                        + "WHERE table_name = 'booking_status_history' AND column_name = {0}",
+                    column
+                )
                 .SingleAsync();
 
-            exists.Should().Be(1,
-                because: $"Таблица booking_status_history должна содержать колонку '{column}'");
+            exists
+                .Should()
+                .Be(1, $"Таблица booking_status_history должна содержать колонку '{column}'");
         }
     }
 
@@ -64,14 +74,18 @@ public class Task04_AuditLogTests : IntegrationTestBase
         var (bookingId, _) = await CreateBookingAsync();
 
         // Assert: при создании статус меняется на AwaitConfirmation
-        var historyCount = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM booking_status_history " +
-            "WHERE booking_id = {0} AND status_to = {1}",
-            bookingId, (int)BookingStatus.AwaitConfirmation)
+        var historyCount = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM booking_status_history "
+                    + "WHERE booking_id = {0} AND status_to = {1}",
+                bookingId,
+                (int)BookingStatus.AwaitConfirmation
+            )
             .SingleAsync();
 
-        historyCount.Should().Be(1,
-            because: "Создание бронирования должно зафиксировать переход в статус AwaitConfirmation");
+        historyCount
+            .Should()
+            .Be(1, "Создание бронирования должно зафиксировать переход в статус AwaitConfirmation");
     }
 
     [Fact]
@@ -84,14 +98,18 @@ public class Task04_AuditLogTests : IntegrationTestBase
         await ConfirmBookingAsync(catalogRequestId);
 
         // Assert: должна быть запись с status_to = Confirmed
-        var confirmedEntryCount = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM booking_status_history " +
-            "WHERE booking_id = {0} AND status_to = {1}",
-            bookingId, (int)BookingStatus.Confirmed)
+        var confirmedEntryCount = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM booking_status_history "
+                    + "WHERE booking_id = {0} AND status_to = {1}",
+                bookingId,
+                (int)BookingStatus.Confirmed
+            )
             .SingleAsync();
 
-        confirmedEntryCount.Should().Be(1,
-            because: "Подтверждение бронирования должно добавить запись с status_to = Confirmed");
+        confirmedEntryCount
+            .Should()
+            .Be(1, "Подтверждение бронирования должно добавить запись с status_to = Confirmed");
     }
 
     [Fact]
@@ -105,15 +123,22 @@ public class Task04_AuditLogTests : IntegrationTestBase
         await BookingService.CancelBooking(bookingId);
 
         // Assert
-        var cancellationEntryCount = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM booking_status_history " +
-            "WHERE booking_id = {0} AND status_to = {1}",
-            bookingId, (int)BookingStatus.CancellationPending)
+        var cancellationEntryCount = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM booking_status_history "
+                    + "WHERE booking_id = {0} AND status_to = {1}",
+                bookingId,
+                (int)BookingStatus.CancellationPending
+            )
             .SingleAsync();
 
-        cancellationEntryCount.Should().Be(1,
-            because: "Запрос отмены подтверждённого бронирования должен добавить запись " +
-                     "с status_to = CancellationPending");
+        cancellationEntryCount
+            .Should()
+            .Be(
+                1,
+                "Запрос отмены подтверждённого бронирования должен добавить запись "
+                    + "с status_to = CancellationPending"
+            );
     }
 
     [Fact]
@@ -128,14 +153,21 @@ public class Task04_AuditLogTests : IntegrationTestBase
         await BookingService.HandleCancellationError(catalogRequestId);
 
         // Assert: вторая запись с status_to = Confirmed (первая — при создании+подтверждении)
-        var rollbackEntryCount = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM booking_status_history " +
-            "WHERE booking_id = {0} AND status_to = {1}",
-            bookingId, (int)BookingStatus.Confirmed)
+        var rollbackEntryCount = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM booking_status_history "
+                    + "WHERE booking_id = {0} AND status_to = {1}",
+                bookingId,
+                (int)BookingStatus.Confirmed
+            )
             .SingleAsync();
 
-        rollbackEntryCount.Should().BeGreaterThanOrEqualTo(1,
-            because: "Компенсирующая транзакция (DLQ) должна зафиксировать откат к Confirmed");
+        rollbackEntryCount
+            .Should()
+            .BeGreaterThanOrEqualTo(
+                1,
+                "Компенсирующая транзакция (DLQ) должна зафиксировать откат к Confirmed"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -146,8 +178,8 @@ public class Task04_AuditLogTests : IntegrationTestBase
     public async Task GetBookingHistory_ReturnsHistoryForSpecificBookingOnly()
     {
         // Arrange: два разных бронирования с отдельными историями
-        var (bookingId1, requestId1) = await CreateBookingAsync(userId: 1, resourceId: 1);
-        var (bookingId2, requestId2) = await CreateBookingAsync(userId: 2, resourceId: 2);
+        var (bookingId1, requestId1) = await CreateBookingAsync(1, 1);
+        var (bookingId2, requestId2) = await CreateBookingAsync(2, 2);
         await ConfirmBookingAsync(requestId1);
         await ConfirmBookingAsync(requestId2);
 
@@ -155,10 +187,16 @@ public class Task04_AuditLogTests : IntegrationTestBase
         var history = await BookingService.GetBookingHistory(bookingId1);
 
         // Assert
-        history.Should().NotBeEmpty(
-            because: "GetBookingHistory должен возвращать историю существующего бронирования");
-        history.Should().OnlyContain(h => h.BookingId == bookingId1,
-            because: "Метод должен возвращать историю только для запрошенного бронирования");
+        history
+            .Should()
+            .NotBeEmpty("GetBookingHistory должен возвращать историю существующего бронирования");
+
+        history
+            .Should()
+            .OnlyContain(
+                h => h.BookingId == bookingId1,
+                "Метод должен возвращать историю только для запрошенного бронирования"
+            );
     }
 
     [Fact]
@@ -174,10 +212,19 @@ public class Task04_AuditLogTests : IntegrationTestBase
         var history = await BookingService.GetBookingHistory(bookingId);
 
         // Assert
-        history.Should().HaveCountGreaterThanOrEqualTo(3,
-            because: "Должно быть минимум 3 записи: Create → Confirm → CancellationPending → Rollback");
-        history.Should().BeInAscendingOrder(h => h.ChangedAt,
-            because: "История должна быть отсортирована по времени (от старых к новым)");
+        history
+            .Should()
+            .HaveCountGreaterThanOrEqualTo(
+                3,
+                "Должно быть минимум 3 записи: Create → Confirm → CancellationPending → Rollback"
+            );
+
+        history
+            .Should()
+            .BeInAscendingOrder(
+                h => h.ChangedAt,
+                "История должна быть отсортирована по времени (от старых к новым)"
+            );
     }
 
     [Fact]
@@ -190,7 +237,8 @@ public class Task04_AuditLogTests : IntegrationTestBase
         var history = await BookingService.GetBookingHistory(nonExistentId);
 
         // Assert
-        history.Should().BeEmpty(
-            because: "Для несуществующего бронирования метод должен вернуть пустой список");
+        history
+            .Should()
+            .BeEmpty("Для несуществующего бронирования метод должен вернуть пустой список");
     }
 }

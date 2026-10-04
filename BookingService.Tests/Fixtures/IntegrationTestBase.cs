@@ -31,7 +31,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 
     protected BookingDbContext Context { get; private set; } = null!;
     protected Services.BookingService BookingService { get; private set; } = null!;
-    protected IBus BusMock { get; private set; } = null!;
+    protected BookingRepository repository { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
@@ -46,18 +46,19 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         // Применяем все миграции (включая те, что добавлены в задачах)
         await Context.Database.MigrateAsync();
 
-        // IBus мокируем — не нужен реальный RabbitMQ
-        BusMock = Substitute.For<IBus>();
+        repository = new BookingRepository(Context);
 
-        var publisher = new BookingEventPublisher(
-            BusMock,
-            NullLogger<BookingEventPublisher>.Instance);
+        var publisher = new BookingEventTracker(
+            NullLogger<BookingEventTracker>.Instance,
+            repository
+        );
 
         BookingService = new Services.BookingService(
             new BookingRepository(Context),
             publisher,
             new CurrentDateTimeProvider(),
-            NullLogger<Services.BookingService>.Instance);
+            NullLogger<Services.BookingService>.Instance
+        );
     }
 
     public async Task DisposeAsync()
@@ -74,7 +75,8 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         long userId = 1,
         long resourceId = 1,
         int daysFromNow = 7,
-        int durationDays = 3)
+        int durationDays = 3
+    )
     {
         var from = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysFromNow));
         var to = from.AddDays(durationDays);
@@ -82,8 +84,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         var bookingId = await BookingService.CreateBooking(userId, resourceId, from, to);
 
         // Перезагружаем, чтобы получить CatalogRequestId присвоенный сервисом
-        await Context.Entry(Context.Bookings.Local.First(b => b.Id == bookingId))
-            .ReloadAsync();
+        await Context.Entry(Context.Bookings.Local.First(b => b.Id == bookingId)).ReloadAsync();
 
         var booking = await Context.Bookings.FindAsync(bookingId);
         return (bookingId, booking!.CatalogRequestId!.Value);
@@ -92,6 +93,8 @@ public abstract class IntegrationTestBase : IAsyncLifetime
     /// <summary>
     /// Переводит бронирование в статус Confirmed через HandleBookingJobConfirmed
     /// </summary>
-    protected async Task ConfirmBookingAsync(Guid catalogRequestId)
-        => await BookingService.HandleBookingJobConfirmed(catalogRequestId);
+    protected async Task ConfirmBookingAsync(Guid catalogRequestId, Guid eventId = default)
+    {
+        await BookingService.HandleBookingJobConfirmed(catalogRequestId, eventId);
+    }
 }

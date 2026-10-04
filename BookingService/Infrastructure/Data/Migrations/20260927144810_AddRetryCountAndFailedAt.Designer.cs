@@ -4,6 +4,7 @@ using System.Text.Json;
 using BookingService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BookingService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    partial class BookingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260927144810_AddRetryCountAndFailedAt")]
+    partial class AddRetryCountAndFailedAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -72,22 +75,8 @@ namespace BookingService.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CatalogRequestId")
-                        .IsUnique()
-                        .HasDatabaseName("idx_bookings_catalog_request_id");
-
-                    b.HasIndex("CreatedAt")
-                        .IsDescending()
-                        .HasDatabaseName("idx_bookings_created_at");
-
                     b.HasIndex("ResourceId")
                         .HasDatabaseName("idx_bookings_resource_id");
-
-                    b.HasIndex("UserId", "Status")
-                        .HasDatabaseName("idx_bookings_user_id_status");
-
-                    b.HasIndex("ResourceId", "BookedFrom", "BookedTo")
-                        .HasDatabaseName("idx_bookings_resource_id_dates");
 
                     b.HasIndex(new[] { "Status" }, "idx_bookings_cancellation_pending")
                         .HasFilter("status = 4");

@@ -26,13 +26,14 @@ public class Task05_IdempotencyTests : IntegrationTestBase
     [Fact]
     public async Task Migration_ProcessedEventsTable_Exists()
     {
-        var tableExists = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM information_schema.tables " +
-            "WHERE table_schema = 'public' AND table_name = 'processed_events'")
+        var tableExists = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM information_schema.tables "
+                    + "WHERE table_schema = 'public' AND table_name = 'processed_events'"
+            )
             .SingleAsync();
 
-        tableExists.Should().Be(1,
-            because: "Миграция задачи 05 должна создать таблицу processed_events");
+        tableExists.Should().Be(1, "Миграция задачи 05 должна создать таблицу processed_events");
     }
 
     [Fact]
@@ -42,14 +43,15 @@ public class Task05_IdempotencyTests : IntegrationTestBase
 
         foreach (var column in requiredColumns)
         {
-            var exists = await Context.Database.SqlQueryRaw<int>(
-                "SELECT COUNT(*)::int FROM information_schema.columns " +
-                "WHERE table_name = 'processed_events' AND column_name = {0}",
-                column)
+            var exists = await Context
+                .Database.SqlQueryRaw<int>(
+                    "SELECT COUNT(*)::int FROM information_schema.columns "
+                        + "WHERE table_name = 'processed_events' AND column_name = {0}",
+                    column
+                )
                 .SingleAsync();
 
-            exists.Should().Be(1,
-                because: $"Таблица processed_events должна содержать колонку '{column}'");
+            exists.Should().Be(1, $"Таблица processed_events должна содержать колонку '{column}'");
         }
     }
 
@@ -70,9 +72,11 @@ public class Task05_IdempotencyTests : IntegrationTestBase
         var act = async () => await BookingService.HandleBookingJobConfirmed(catalogRequestId);
 
         // Assert
-        await act.Should().NotThrowAsync(
-            because: "Повторная доставка BookingJobConfirmed должна быть проигнорирована " +
-                     "без исключений — идемпотентность обязательна при at-least-once доставке");
+        await act.Should()
+            .NotThrowAsync(
+                "Повторная доставка BookingJobConfirmed должна быть проигнорирована "
+                    + "без исключений — идемпотентность обязательна при at-least-once доставке"
+            );
     }
 
     [Fact]
@@ -87,8 +91,12 @@ public class Task05_IdempotencyTests : IntegrationTestBase
 
         // Assert: статус должен остаться Confirmed, а не откатиться
         var booking = await Context.Bookings.FindAsync(bookingId);
-        booking!.Status.Should().Be(BookingStatus.Confirmed,
-            because: "Повторная обработка не должна изменять статус уже подтверждённого бронирования");
+        booking!
+            .Status.Should()
+            .Be(
+                BookingStatus.Confirmed,
+                "Повторная обработка не должна изменять статус уже подтверждённого бронирования"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -108,8 +116,10 @@ public class Task05_IdempotencyTests : IntegrationTestBase
         var act = async () => await BookingService.HandleBookingJobDenied(catalogRequestId);
 
         // Assert
-        await act.Should().NotThrowAsync(
-            because: "Повторная доставка BookingJobDenied должна быть проигнорирована без исключений");
+        await act.Should()
+            .NotThrowAsync(
+                "Повторная доставка BookingJobDenied должна быть проигнорирована без исключений"
+            );
     }
 
     [Fact]
@@ -124,8 +134,12 @@ public class Task05_IdempotencyTests : IntegrationTestBase
 
         // Assert
         var booking = await Context.Bookings.FindAsync(bookingId);
-        booking!.Status.Should().Be(BookingStatus.Cancelled,
-            because: "Повторная обработка не должна изменять статус уже отменённого бронирования");
+        booking!
+            .Status.Should()
+            .Be(
+                BookingStatus.Cancelled,
+                "Повторная обработка не должна изменять статус уже отменённого бронирования"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -142,14 +156,20 @@ public class Task05_IdempotencyTests : IntegrationTestBase
         await BookingService.HandleBookingJobConfirmed(catalogRequestId);
 
         // Assert: идентификатор события должен быть записан
-        var recordedEventCount = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM processed_events WHERE event_id = {0}",
-            catalogRequestId)
+        var recordedEventCount = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM processed_events WHERE event_id = {0}",
+                catalogRequestId
+            )
             .SingleAsync();
 
-        recordedEventCount.Should().BeGreaterThanOrEqualTo(1,
-            because: "Обработанное событие должно быть сохранено в processed_events " +
-                     "для последующей проверки дубликатов");
+        recordedEventCount
+            .Should()
+            .BeGreaterThanOrEqualTo(
+                1,
+                "Обработанное событие должно быть сохранено в processed_events "
+                    + "для последующей проверки дубликатов"
+            );
     }
 
     [Fact]
@@ -163,13 +183,19 @@ public class Task05_IdempotencyTests : IntegrationTestBase
         await BookingService.HandleBookingJobConfirmed(catalogRequestId);
 
         // Assert: не должно быть дублирующих записей
-        var recordedEventCount = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM processed_events WHERE event_id = {0}",
-            catalogRequestId)
+        var recordedEventCount = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM processed_events WHERE event_id = {0}",
+                catalogRequestId
+            )
             .SingleAsync();
 
-        recordedEventCount.Should().Be(1,
-            because: "Таблица processed_events должна содержать ровно одну запись для события, " +
-                     "даже если оно было получено дважды");
+        recordedEventCount
+            .Should()
+            .Be(
+                1,
+                "Таблица processed_events должна содержать ровно одну запись для события, "
+                    + "даже если оно было получено дважды"
+            );
     }
 }
