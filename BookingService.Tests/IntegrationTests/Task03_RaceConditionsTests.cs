@@ -37,9 +37,13 @@ public class Task03_RaceConditionsTests : IntegrationTestBase
 
         // Assert: статус не должен измениться на Confirmed
         await Context.Entry(booking).ReloadAsync();
-        booking.Status.Should().Be(BookingStatus.CancellationPending,
-            because: "Если пользователь уже запросил отмену (CancellationPending), " +
-                     "запоздалое BookingJobConfirmed не должно откатывать решение об отмене");
+        booking
+            .Status.Should()
+            .Be(
+                BookingStatus.CancellationPending,
+                "Если пользователь уже запросил отмену (CancellationPending), "
+                    + "запоздалое BookingJobConfirmed не должно откатывать решение об отмене"
+            );
     }
 
     [Fact]
@@ -71,8 +75,9 @@ public class Task03_RaceConditionsTests : IntegrationTestBase
         // Имитируем, что отмена была запрошена давно (5+ минут назад)
         // через прямое обновление поля в БД
         await Context.Database.ExecuteSqlRawAsync(
-            "UPDATE bookings SET cancellation_requested_at = NOW() - INTERVAL '10 minutes' WHERE id = {0}",
-            bookingId);
+            "UPDATE bookings SET cancellation_requested_at = pg_catalog.NOW() - INTERVAL '10 minutes' WHERE id = {0}",
+            bookingId
+        );
 
         var repository = new BookingRepository(Context);
 
@@ -81,8 +86,12 @@ public class Task03_RaceConditionsTests : IntegrationTestBase
         var stuck = await repository.FindStuckCancellationsAsync(cutoff);
 
         // Assert
-        stuck.Should().ContainSingle(b => b.Id == bookingId,
-            because: "Бронирование в CancellationPending с меткой времени старше threshold должно попасть в выборку");
+        stuck
+            .Should()
+            .ContainSingle(
+                b => b.Id == bookingId,
+                "Бронирование в CancellationPending с меткой времени старше threshold должно попасть в выборку"
+            );
     }
 
     [Fact]
@@ -100,9 +109,13 @@ public class Task03_RaceConditionsTests : IntegrationTestBase
         var stuck = await repository.FindStuckCancellationsAsync(cutoff);
 
         // Assert
-        stuck.Should().NotContain(b => b.Id == bookingId,
-            because: "Свежее CancellationPending (< 5 мин) ещё не считается зависшим — " +
-                     "нужно дать Catalog Service время обработать команду");
+        stuck
+            .Should()
+            .NotContain(
+                b => b.Id == bookingId,
+                "Свежее CancellationPending (< 5 мин) ещё не считается зависшим — "
+                    + "нужно дать Catalog Service время обработать команду"
+            );
     }
 
     [Fact]
@@ -119,8 +132,12 @@ public class Task03_RaceConditionsTests : IntegrationTestBase
         var stuck = await repository.FindStuckCancellationsAsync(cutoff);
 
         // Assert
-        stuck.Should().NotContain(b => b.Id == bookingId,
-            because: "Подтверждённые бронирования не должны попадать в выборку зависших отмен");
+        stuck
+            .Should()
+            .NotContain(
+                b => b.Id == bookingId,
+                "Подтверждённые бронирования не должны попадать в выборку зависших отмен"
+            );
     }
 
     // -----------------------------------------------------------------------
@@ -135,13 +152,21 @@ public class Task03_RaceConditionsTests : IntegrationTestBase
         var entityType = Context.Model.FindEntityType(typeof(Booking))!;
         var versionProperty = entityType.FindProperty(nameof(Booking.Version));
 
-        versionProperty.Should().NotBeNull(
-            because: "Свойство Version должно быть зарегистрировано в EF Core модели");
-        versionProperty!.IsConcurrencyToken.Should().BeTrue(
-            because: "xmin должен быть настроен как токен параллелизма " +
-                     "для обнаружения конкурентных изменений (DbUpdateConcurrencyException)");
-        versionProperty.GetColumnName().Should().Be("xmin",
-            because: "Токен параллелизма должен маппиться на системный столбец xmin PostgreSQL");
+        versionProperty
+            .Should()
+            .NotBeNull("Свойство Version должно быть зарегистрировано в EF Core модели");
+
+        versionProperty!
+            .IsConcurrencyToken.Should()
+            .BeTrue(
+                "xmin должен быть настроен как токен параллелизма "
+                    + "для обнаружения конкурентных изменений (DbUpdateConcurrencyException)"
+            );
+
+        versionProperty
+            .GetColumnName()
+            .Should()
+            .Be("xmin", "Токен параллелизма должен маппиться на системный столбец xmin PostgreSQL");
     }
 
     // -----------------------------------------------------------------------
@@ -152,13 +177,19 @@ public class Task03_RaceConditionsTests : IntegrationTestBase
     public async Task Migration_CancellationPendingIndex_Exists()
     {
         // Проверяем наличие частичного индекса для выборки зависших отмен
-        var indexExists = await Context.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*)::int FROM pg_indexes " +
-            "WHERE tablename = 'bookings' AND indexname = 'idx_bookings_cancellation_pending'")
+        var indexExists = await Context
+            .Database.SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int FROM pg_indexes "
+                    + "WHERE tablename = 'bookings' AND indexname = 'idx_bookings_cancellation_pending'"
+            )
             .SingleAsync();
 
-        indexExists.Should().Be(1,
-            because: "Должен существовать индекс idx_bookings_cancellation_pending " +
-                     "для эффективной выборки зависших отмен фоновым job'ом");
+        indexExists
+            .Should()
+            .Be(
+                1,
+                "Должен существовать индекс idx_bookings_cancellation_pending "
+                    + "для эффективной выборки зависших отмен фоновым job'ом"
+            );
     }
 }
