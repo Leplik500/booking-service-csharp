@@ -22,6 +22,9 @@ var notificationsConfigSection = builder.Configuration.GetSection("NotificationS
 var notificationsSettings = notificationsConfigSection.Get<NotificationServiceSettings>()!;
 builder.Services.Configure<NotificationServiceSettings>(notificationsConfigSection);
 
+var cacheSettingsSection = builder.Configuration.GetSection("Cache");
+builder.Services.Configure<CacheSettings>(cacheSettingsSection);
+
 // ---- Controllers & OpenAPI ----
 builder
     .Services.AddControllers()
@@ -53,6 +56,7 @@ builder.Services.AddScoped<BookingMapper>();
 builder.Services.AddSingleton<ICurrentDateTimeProvider, CurrentDateTimeProvider>();
 builder.Services.AddHostedService<StuckCancellationsJob>();
 builder.Services.AddHostedService<OutboxProcessorJob>();
+builder.Services.AddMemoryCache();
 
 var clientBuilder = builder.Services.AddHttpClient<INotificationService, NotificationService>(
     client => client.BaseAddress = new Uri(notificationsSettings.BaseUrl)

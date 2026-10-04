@@ -8,6 +8,7 @@ using BookingService.Infrastructure.Messaging.Contracts;
 using BookingService.Infrastructure.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace BookingService.Services;
@@ -22,12 +23,14 @@ public class BookingService
     private readonly BookingEventTracker _tracker;
     private readonly ICurrentDateTimeProvider _dateTimeProvider;
     private readonly ILogger<BookingService> _logger;
+    private const string CacheKey = "statistics";
 
     // [Task 09] Опциональная зависимость — существующие тесты создают сервис без неё
     private readonly INotificationService? _notificationService;
 
     // [Task 10] Опциональная зависимость — существующие тесты создают сервис без неё
     private readonly IMemoryCache? _cache;
+    private readonly CacheSettings? _cacheSettings;
 
     public BookingService(
         BookingRepository repository,
@@ -35,13 +38,15 @@ public class BookingService
         ICurrentDateTimeProvider dateTimeProvider,
         ILogger<BookingService> logger,
         INotificationService? notificationService = null,
-        IMemoryCache? cache = null
+        IMemoryCache? cache = null,
+        IOptions<CacheSettings>? cacheSettings = null
     )
     {
         _repository = repository;
         _tracker = tracker;
         _dateTimeProvider = dateTimeProvider;
         _logger = logger;
+        _cacheSettings = cacheSettings?.Value;
         _notificationService = notificationService;
         _cache = cache;
     }
@@ -76,6 +81,7 @@ public class BookingService
 
         await _tracker.TrackCreateBookingJob(command);
         await _repository.SaveAsync(booking);
+        InvalidateStatisticsCache();
 
         _logger.LogInformation(
             "Создано бронирование с ID: {Id}, requestId: {RequestId}",
@@ -123,6 +129,7 @@ public class BookingService
         }
 
         await _repository.SaveAsync(booking);
+        InvalidateStatisticsCache();
         await _notificationService.NotifySafeAsync(booking.Id, oldStatus, newStatus, _logger);
         _logger.LogInformation(
             "Инициирована отмена бронирования с ID: {Id}, новый статус: {Status}",
@@ -166,7 +173,19 @@ public class BookingService
 
     public async Task<StatisticsResponse> GetStatistics()
     {
-        return await _repository.GetStatisticsAsync();
+        if (_cache?.TryGetValue(CacheKey, out StatisticsResponse? cached) == true)
+            return cached!;
+
+        var result = await _repository.GetStatisticsAsync();
+
+        if (_cacheSettings != null)
+            _cache?.Set(
+                CacheKey,
+                result,
+                TimeSpan.FromSeconds(_cacheSettings.StatisticsTTLSeconds)
+            );
+
+        return result;
     }
 
     // === EVENT HANDLERS (Обработка асинхронных событий от Catalog Service) ===
@@ -238,6 +257,7 @@ public class BookingService
                 booking.Confirm();
 
                 await _repository.SaveAsync(booking);
+                InvalidateStatisticsCache();
                 var newStatus = booking.Status;
                 await _notificationService.NotifySafeAsync(
                     booking.Id,
@@ -363,6 +383,7 @@ public class BookingService
             );
 
             await _repository.SaveAsync(booking);
+            InvalidateStatisticsCache();
             await _notificationService.NotifySafeAsync(booking.Id, oldStatus, newStatus, _logger);
         }
         catch (DbUpdateException e)
@@ -450,6 +471,7 @@ public class BookingService
             );
 
             await _repository.SaveAsync(booking);
+            InvalidateStatisticsCache();
             await _notificationService.NotifySafeAsync(booking.Id, oldStatus, newStatus, _logger);
         }
         catch (DbUpdateException e)
@@ -478,5 +500,10 @@ public class BookingService
     {
         await GetById(bookingId);
         return await _repository.GetBookingHistoryAsync(bookingId, cancellationToken);
+    }
+
+    private void InvalidateStatisticsCache()
+    {
+        _cache?.Remove(CacheKey);
     }
 }
