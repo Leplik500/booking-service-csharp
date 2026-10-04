@@ -30,7 +30,7 @@ public class BookingService
 
     // [Task 10] Опциональная зависимость — существующие тесты создают сервис без неё
     private readonly IMemoryCache? _cache;
-    private readonly CacheSettings? _cacheSettings;
+    private readonly long? TTLSeconds;
 
     public BookingService(
         BookingRepository repository,
@@ -46,9 +46,9 @@ public class BookingService
         _tracker = tracker;
         _dateTimeProvider = dateTimeProvider;
         _logger = logger;
-        _cacheSettings = cacheSettings?.Value;
         _notificationService = notificationService;
         _cache = cache;
+        TTLSeconds = cacheSettings is null ? 60 : cacheSettings.Value.StatisticsTTLSeconds;
     }
 
     // === КОМАНДЫ (Use Cases) ===
@@ -178,12 +178,8 @@ public class BookingService
 
         var result = await _repository.GetStatisticsAsync();
 
-        if (_cacheSettings != null)
-            _cache?.Set(
-                CacheKey,
-                result,
-                TimeSpan.FromSeconds(_cacheSettings.StatisticsTTLSeconds)
-            );
+        if (TTLSeconds != null)
+            _cache?.Set(CacheKey, result, TimeSpan.FromSeconds((long)TTLSeconds));
 
         return result;
     }
