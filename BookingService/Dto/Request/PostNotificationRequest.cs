@@ -3,7 +3,7 @@ using BookingService.Entities;
 namespace BookingService.Dto.Request;
 
 public record PostNotificationRequest(
-    long bookingId,
-    BookingStatus oldStatus,
-    BookingStatus newStatus
+    long BookingId,
+    BookingStatus OldStatus,
+    BookingStatus NewStatus
 );

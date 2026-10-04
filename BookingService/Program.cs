@@ -55,7 +55,7 @@ builder.Services.AddHostedService<StuckCancellationsJob>();
 builder.Services.AddHostedService<OutboxProcessorJob>();
 
 var clientBuilder = builder.Services.AddHttpClient<INotificationService, NotificationService>(
-    client => client.BaseAddress = new Uri(notificationsSettings.Retry.BaseUrl)
+    client => client.BaseAddress = new Uri(notificationsSettings.BaseUrl)
 );
 
 clientBuilder.AddStandardResilienceHandler(options =>

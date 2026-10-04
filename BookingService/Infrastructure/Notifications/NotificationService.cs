@@ -1,7 +1,5 @@
-using BookingService.Configuration;
 using BookingService.Dto.Request;
 using BookingService.Entities;
-using Microsoft.Extensions.Options;
 using Polly.CircuitBreaker;
 using Polly.Timeout;
 
@@ -11,17 +9,11 @@ public class NotificationService : INotificationService
 {
     private readonly ILogger<NotificationService> _logger;
     private readonly HttpClient _httpClient;
-    private readonly NotificationServiceSettings _options;
 
-    public NotificationService(
-        ILogger<NotificationService> logger,
-        HttpClient httpClient,
-        IOptions<NotificationServiceSettings> options
-    )
+    public NotificationService(ILogger<NotificationService> logger, HttpClient httpClient)
     {
         _logger = logger;
         _httpClient = httpClient;
-        _options = options.Value;
     }
 
     public async Task NotifyStatusChangedAsync(
